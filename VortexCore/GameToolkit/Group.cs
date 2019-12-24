@@ -25,16 +25,14 @@ namespace VortexCore
         {
             GameObjects.Add(gameObject);
 
-            gameObject.Update();
-
             RecalculateGroupSize();
         }
 
-        public override void Update()
+        public override void Update(float dt)
         {
             for (var i = 0; i < GameObjects.Count; ++i)
             {
-                GameObjects[i].Update();
+                GameObjects[i].Update(dt);
             }
         }
 

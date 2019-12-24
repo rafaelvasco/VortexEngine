@@ -43,12 +43,7 @@ namespace VortexCore
             throw new NotImplementedException();
         }
 
-        void Graphics.DrawTexture(Texture2D texture, float x, float y)
-        {
-            throw new NotImplementedException();
-        }
-
-        void Graphics.DrawTextureRegion(Texture2D texture, float x, float y, ref Rect sourceRect)
+        void Graphics.DrawQuad(Texture2D texture, ref Quad quad)
         {
             throw new NotImplementedException();
         }

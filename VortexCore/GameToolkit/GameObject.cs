@@ -1,8 +1,16 @@
-﻿namespace VortexCore
+﻿using System;
+using System.Diagnostics;
+using System.Threading;
+
+namespace VortexCore
 {
     public abstract class GameObject
     {
-        public string Id { get; internal set; }
+        private static long latestAssignedId = 0;
+
+        public ulong Id { get; }
+
+        public string Name { get; set; }
 
         public float X;
 
@@ -14,10 +22,24 @@
 
         public bool Visible = true;
 
-        public abstract void Update();
+        protected GameObject() : this(Guid.NewGuid().ToString()) { }
+
+        private GameObject(string name)
+        {
+            Name = name;
+            Id = GetNextId();
+        }
+
+        public abstract void Update(float dt);
 
         public abstract void Draw(Graphics graphics, float parentX = 0, float parentY = 0);
 
+        private static ulong GetNextId()
+        {
+            ulong newID = unchecked((ulong)Interlocked.Increment(ref latestAssignedId));
+            Debug.Assert(newID != 0); // Overflow
 
+            return newID;
+        }
     }
 }

@@ -3,7 +3,7 @@
 
 namespace VortexDemo
 {
-    public class Player : GameObject
+    public class Player : Actor
     {
         private Spritesheet spritesheet;
         private Animation idle;
@@ -19,27 +19,25 @@ namespace VortexDemo
             walking = new Animation(spritesheet, 4, 5, 6, 7);
 
             currentAnimation = idle;
+
+            //FourAxisMovement behavior = AddBehavior<FourAxisMovement>();
+
+            //behavior.Friction = 0.05f;
+
+            AddBehavior<GridMovement>();
+
         }
 
         public override void Draw(Graphics graphics, float parentX = 0, float parentY = 0)
         {
-            this.currentAnimation.Draw(graphics);
+            this.currentAnimation.Draw(graphics, this.X, this.Y);
         }
 
-        public override void Update()
+        public override void Update(float dt)
         {
-            currentAnimation.Update();
+            base.Update(dt);
 
-            if (Input.KeyPressed(Key.Right))
-            {
-                currentAnimation = walking;
-                currentAnimation.Play();
-            }
-            else if (Input.KeyReleased(Key.Right))
-            {
-                currentAnimation = idle;
-                currentAnimation.Play();
-            }
+            currentAnimation.Update(dt);
         }
     }
 }

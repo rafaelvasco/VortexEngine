@@ -6,8 +6,8 @@ namespace VortexDemo
     {
         static void Main()
         {
-            using var game = new Game();
-            game.Start(new DemoScene());
+            using var game = new DemoGame();
+            game.Start();
         }
     }
 }

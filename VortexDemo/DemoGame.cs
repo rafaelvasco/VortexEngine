@@ -2,10 +2,10 @@
 
 namespace VortexDemo
 {
-    public class DemoScene : GameScene
+    public class DemoGame : Game
     {
-        private float sx = 3;
-        private float sy = 3;
+        private float sx = 300;
+        private float sy = 300;
         private float x = 100;
         private float y = 100;
 
@@ -13,7 +13,7 @@ namespace VortexDemo
         private Player player;
         private Gui gui;
 
-        public override void Draw(Graphics graphics)
+        protected override void Draw(Graphics graphics)
         {
             sprite.Draw(graphics);
             player.Draw(graphics);
@@ -21,25 +21,18 @@ namespace VortexDemo
             graphics.FillRect(x, y, 100, 100, Color.Red);
         }
 
-        public override void End()
-        {
-        }
-
-        public override void Init()
-        {
-        }
-
-        public override void Load()
+       
+        protected override void Load()
         {
             sprite = new Sprite(Assets.LoadTexture("ball.png"));
             player = new Player();
             gui = new Gui();
         }
 
-        public override void Update(GameTime gameTime)
+        protected override void Update(float dt)
         {
-            x += sx;
-            y += sy;
+            x += sx * dt;
+            y += sy * dt;
 
             if (x > 700)
             {
@@ -65,17 +58,17 @@ namespace VortexDemo
 
             if (Input.KeyDown(Key.A))
             {
-                gui.X -= 1;
+                gui.X -= 100 * dt;
             }
 
             if (Input.KeyDown(Key.D))
             {
-                gui.X += 1;
+                gui.X += 100 * dt;
             }
  
 
-            gui.Update();
-            player.Update();
+            gui.Update(dt);
+            player.Update(dt);
         }
     }
 }

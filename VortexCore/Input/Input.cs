@@ -1,5 +1,85 @@
-﻿namespace VortexCore
+﻿using System;
+using System.Collections.Generic;
+
+namespace VortexCore
 {
+    public class InputAction
+    {
+
+        public int InputCode { get; internal set; }
+
+        public Action Action { get; internal set; }
+
+        public bool WasPressed 
+        {
+            get => Input.KeyPressed((Key)this.InputCode) ||
+                   Input.MousePressed((MouseButton)this.InputCode);
+        }
+
+        public bool WasReleased 
+        {
+            get => Input.KeyReleased((Key)this.InputCode) ||
+                   Input.MouseReleased((MouseButton)this.InputCode);
+        }
+
+        public bool IsDown 
+        {
+            get => Input.KeyDown((Key)this.InputCode) ||
+                   Input.MouseDown((MouseButton)this.InputCode);
+        }
+
+        internal InputAction(int inputCode, Action action)
+        {
+            this.InternalMap(inputCode, action);
+        }
+
+        public void Map(Key key, Action action = null)
+        {
+            this.InternalMap((int)key, action);
+        }
+
+        public void Map(MouseButton button, Action action = null)
+        {
+            this.InternalMap((int)button, action);
+        }
+
+        private void InternalMap(int inputCode, Action action)
+        {
+            this.InputCode = inputCode;
+            this.Action = action;
+        }
+
+        public void Execute()
+        {
+            this.Action?.Invoke();
+        }
+
+        public void ExecuteIfPressed()
+        {
+            if (WasPressed)
+            {
+                Execute();
+            }
+        }
+
+        public void ExecuteIfDown()
+        {
+            if (IsDown)
+            {
+                Execute();
+            }
+        }
+
+        public void ExecuteIfReleased()
+        {
+            if (WasReleased)
+            {
+                Execute();
+            }
+
+        }
+    }
+
     public static class Input
     {
         private static KeyState prevKeyState;
@@ -8,6 +88,7 @@
         private static MouseState curMouseState;
         private static Point mousePosition;
 
+        private static Dictionary<int, InputAction> inputActionsPool = new Dictionary<int, InputAction>();
 
         public static int MouseX => mousePosition.X;
 
@@ -19,6 +100,33 @@
         {
             GamePlatform.OnMouseScroll += OnGamePlatformMouseScroll;
             GamePlatform.OnMouseMove += OnGamePlatformMouseMove;
+        }
+
+        private static InputAction MapInternal(int inputCode, Action action)
+        {
+
+            if (inputActionsPool.TryGetValue(inputCode, out var inputAction))
+            {
+                inputAction.InputCode = inputCode;
+                inputAction.Action = action;
+                return inputAction;
+            }
+
+            var newInputAction = new InputAction(inputCode, action);
+
+            inputActionsPool.Add(inputCode, newInputAction);
+
+            return newInputAction;
+        }
+
+        public static InputAction Map(Key key, Action action = null)
+        {
+            return MapInternal((int)key, action);
+        }
+
+        public static InputAction Map(MouseButton mouseButton, Action action = null)
+        {
+            return MapInternal((int)mouseButton, action);
         }
 
         public static bool KeyDown(Key key)
@@ -50,6 +158,8 @@
         {
             return !curMouseState[button] && prevMouseState[button];
         }
+
+
 
         private static void OnGamePlatformMouseMove(object sender, Point e)
         {

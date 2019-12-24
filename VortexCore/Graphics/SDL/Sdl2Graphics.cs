@@ -7,7 +7,7 @@ namespace VortexCore
     {
         private readonly IntPtr ctx;
 
-        internal Sdl2Graphics(int width, int height) 
+        internal Sdl2Graphics(int width, int height)
         {
             ctx = SDL_CreateRenderer(
                GamePlatform.DisplayHandle,
@@ -41,7 +41,7 @@ namespace VortexCore
         void Graphics.Begin()
         {
             SDL_SetRenderDrawColor(ctx, 255, 173, 197, 255);
-            
+
             SDL_RenderClear(ctx);
 
         }
@@ -55,40 +55,7 @@ namespace VortexCore
             GC.SuppressFinalize(this);
             SDL_DestroyRenderer(ctx);
         }
-
-        void Graphics.DrawTexture(Texture2D texture, float x, float y)
-        {
-            var targetRect = new SDL_FRect() 
-            {
-                x = x, 
-                y = y,
-                w = texture.Width, 
-                h = texture.Height
-            };
-            SDL_RenderCopyF(ctx, texture.Handle, IntPtr.Zero, ref targetRect);
-        }
-
-        void Graphics.DrawTextureRegion(Texture2D texture, float x, float y, ref Rect sourceRect)
-        {
-            var srcRect = new SDL_Rect() 
-            {
-                x = sourceRect.X,
-                y = sourceRect.Y,
-                w = sourceRect.Width,
-                h = sourceRect.Height
-            };
-
-            var targetRect = new SDL_FRect() 
-            {
-                x = x,
-                y = y,
-                w = sourceRect.Width,
-                h = sourceRect.Height
-            };
-
-            SDL_RenderCopyF(ctx, texture.Handle, ref srcRect, ref targetRect);            
-        }
-
+        
         void Graphics.FillRect(float x, float y, float w, float h, Color color)
         {
             var targetRect = new SDL_FRect()
@@ -103,6 +70,46 @@ namespace VortexCore
             SDL_RenderFillRectF(ctx, ref targetRect);
         }
 
-       
+        void Graphics.DrawQuad(Texture2D texture, ref Quad quad)
+        {
+            var flip = SDL_RendererFlip.SDL_FLIP_NONE;
+
+            if (quad.FlipH)
+            {
+                flip |= SDL_RendererFlip.SDL_FLIP_HORIZONTAL;
+            }
+
+            if (quad.FlipV)
+            {
+                flip |= SDL_RendererFlip.SDL_FLIP_VERTICAL;
+            }
+
+            var srcRect = new SDL_Rect() 
+            {
+                x = (int) quad.SrcX,
+                y = (int) quad.SrcY,
+                w = (int) quad.SrcWidth,
+                h = (int) quad.SrcHeight,
+            };
+
+            var targetRect = new SDL_FRect()
+            {
+                x = quad.X,
+                y = quad.Y,
+                w = quad.Width,
+                h = quad.Height
+            };
+
+            SDL_RenderCopyExF
+           (
+               ctx,
+               texture.Handle,
+               ref srcRect,
+               ref targetRect,
+               0,
+               IntPtr.Zero,
+               flip
+           );
+        }
     }
 }

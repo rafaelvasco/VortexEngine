@@ -3,286 +3,206 @@ using System.Diagnostics;
 using System.Runtime;
 using System.Threading;
 
-namespace VortexCore
-{
-    public class Game : IDisposable
-    {
-        private const int MaxUpdateFrameLag = 5;
-
-        public Size DisplaySize
-        {
-            get => GamePlatform.GetDisplaySize();
-            set
-            {
-                var currentSize = GamePlatform.GetDisplaySize();
-
-                if (value.Width == currentSize.Width && value.Height == currentSize.Height)
-                {
-                    return;
-                }
-
-                if (running)
-                {
-                    displayResizeRequested = true;
-                    requestedDisplaySize = value;
-                }
-                else
-                {
-                    GamePlatform.SetDisplaySize(value.Width, value.Height);
-                }
-            }
-        }
-
-        public string Title
-        {
-            get => GamePlatform.GetDisplayTitle();
-            set
-            {
-                GamePlatform.SetDisplayTitle(value);
-            }
-        }
-
-        public bool Fullscreen
-        {
-            get => GamePlatform.IsFullscreen();
-            set
-            {
-                if(GamePlatform.IsFullscreen() == value)
-                {
-                    return;
-                }
-                if(running)
-                {
-                    toggleFullscreenRequested = true;
-                    
-                }
-                else
-                {
-                    GamePlatform.SetDisplayFullscreen(value);
-                }
-
-                fullscreen = value;
-            }
-        }
-
-        public bool ShowCursor
-        {
-            get => showCursor;
-            set
-            {
-                showCursor = value;
-                GamePlatform.ShowCursor(showCursor);
-            }
-        }
-
-        public GameScene CurrentScene { get; private set; }
-
+namespace VortexCore {
+    public abstract class Game : IDisposable {
 
         private bool running;
         private Size requestedDisplaySize;
         private bool displayResizeRequested;
         private bool toggleFullscreenRequested;
         private bool fullscreen;
-        private bool isFixedTimeStep = true;
-        private TimeSpan targetElapsedTime = TimeSpan.FromTicks((long)((1f/144) * TimeSpan.TicksPerSecond));
-        private TimeSpan inactiveSleepTime = TimeSpan.FromSeconds(0.02);
-        private TimeSpan maxElapsedTime = TimeSpan.FromMilliseconds(500);
-        private TimeSpan accumElapsedTime;
-        private readonly GameTime gameTime;
         private Stopwatch gameTimer;
-        private long previousTicks;
-        private int updateFrameLag;
+        private long previousFrameTicks;
         private bool showCursor = true;
         private readonly Graphics graphics;
 
-        public Game()
-        {
-            GamePlatform.Initialize(800, 600, false);
+        public Size DisplaySize {
+            get => GamePlatform.GetDisplaySize ();
+            set {
+                var currentSize = GamePlatform.GetDisplaySize ();
+
+                if (value.Width == currentSize.Width && value.Height == currentSize.Height) {
+                    return;
+                }
+
+                if (running) {
+                    displayResizeRequested = true;
+                    requestedDisplaySize = value;
+                } else {
+                    GamePlatform.SetDisplaySize (value.Width, value.Height);
+                }
+            }
+        }
+
+        public string Title {
+            get => GamePlatform.GetDisplayTitle ();
+            set {
+                GamePlatform.SetDisplayTitle (value);
+            }
+        }
+
+        public bool Fullscreen {
+            get => GamePlatform.IsFullscreen ();
+            set {
+                if (GamePlatform.IsFullscreen () == value) {
+                    return;
+                }
+                if (running) {
+                    toggleFullscreenRequested = true;
+
+                } else {
+                    GamePlatform.SetDisplayFullscreen (value);
+                }
+
+                fullscreen = value;
+            }
+        }
+
+        public bool ShowCursor {
+            get => showCursor;
+            set {
+                showCursor = value;
+                GamePlatform.ShowCursor (showCursor);
+            }
+        }
+
+        public bool LimitFrameRate { get; set; } = true;
+
+        public double DesiredFrameRate { get; set; } = 60.0;
+
+        public float TimeScale { get; set; } = 1.0f;
+
+        public Game () {
+            GamePlatform.Initialize (800, 600, false);
             GamePlatform.OnQuit += OnGamePlatformQuit;
             GamePlatform.DisplayResized += OnGamePlatformDisplayResized;
-            Assets.Initialize();
+            Assets.Initialize ();
             GameScene.Game = this;
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
-            Input.Init();
+            Input.Init ();
             graphics = GamePlatform.Graphics;
-            gameTime = new GameTime();
 
         }
 
-        ~Game()
-        {
-            ReleaseResources();
+        ~Game () {
+            ReleaseResources ();
         }
 
-        public void Start(GameScene scene = null)
-        {
-            if(running)
-            {
+        public void Start () {
+            if (running) {
                 return;
             }
 
-            CurrentScene = scene;
+            GamePlatform.ShowDisplay (true);
 
-            CurrentScene?.Init();
+            Load();
 
-            CurrentScene?.Load();
+#if RELEASE
+            try {
+#endif
+                Tick ();
+
+#if RELEASE
+            } catch (Exception e) {
+                LogException (e);
+            }
+#endif
+        }
+
+        private void LogException (Exception e) {
+            CrashLogHelper.LogToFile (e, this);
+        }
+
+        private void Tick () {
 
             running = true;
 
-            GamePlatform.ShowDisplay(true);
+            gameTimer = Stopwatch.StartNew ();
 
-            Tick();
+            while (running) {
 
-        }
+                double desiredFrameTime = 1000.0 / DesiredFrameRate;
 
-        private void Tick()
-        {
-            gameTimer = Stopwatch.StartNew();
+                long currentFrameTicks = gameTimer.ElapsedTicks;
 
-            while(running)
-            {
-                RetryTick:
-                if (!GamePlatform.IsActive && inactiveSleepTime.TotalMilliseconds > 1.0)
-                {
-                    Thread.Sleep((int)inactiveSleepTime.TotalMilliseconds);
+                double deltaMilliseconds = (currentFrameTicks - previousFrameTicks) * (1000.0 / Stopwatch.Frequency);
+
+                while (LimitFrameRate && deltaMilliseconds < desiredFrameTime) {
+                    Thread.Sleep (0);
+                    currentFrameTicks = gameTimer.ElapsedTicks;
+                    deltaMilliseconds = (currentFrameTicks - previousFrameTicks) * (1000.0 / Stopwatch.Frequency);
                 }
 
-                var currentTicks = gameTimer.Elapsed.Ticks;
+                previousFrameTicks = currentFrameTicks;
 
-                accumElapsedTime += TimeSpan.FromTicks(currentTicks - previousTicks);
+                float deltaSeconds = (float) (deltaMilliseconds) / 1000.0f;
 
-                if (accumElapsedTime > maxElapsedTime)
-                {
-                    accumElapsedTime = maxElapsedTime;
-                }
+                GamePlatform.ProcessEvents ();
 
-                previousTicks = currentTicks;
+                Input.Update ();
 
-                if (isFixedTimeStep && accumElapsedTime < targetElapsedTime)
-                {
-                    goto RetryTick;
-                }
+                Update(deltaSeconds * TimeScale);
 
-                if (isFixedTimeStep)
-                {
-                    gameTime.ElapsedGameTime = targetElapsedTime;
+                Input.PostUpdate ();
 
-                    var stepCount = 0;
-
-                    while (accumElapsedTime >= targetElapsedTime && running)
-                    {
-                        gameTime.TotalGameTime += targetElapsedTime;
-                        accumElapsedTime -= targetElapsedTime;
-                        ++stepCount;
-
-                        GamePlatform.ProcessEvents();
-
-                        Input.Update();
-
-                        CurrentScene.Update(gameTime);
-
-                        Input.PostUpdate();
-
-                    }
-
-                    updateFrameLag += Math.Max(0, stepCount - 1);
-
-                    if (gameTime.IsRunningSlowly)
-                    {
-                        if (updateFrameLag == 0)
-                        {
-                            gameTime.IsRunningSlowly = false;
-                        }
-                    }
-                    else if (updateFrameLag >= MaxUpdateFrameLag)
-                    {
-                        gameTime.IsRunningSlowly = true;
-                    }
-
-                    if (stepCount == 1 && updateFrameLag > 0)
-                    {
-                        updateFrameLag--;
-                    }
-
-                    gameTime.ElapsedGameTime = TimeSpan.FromTicks(targetElapsedTime.Ticks * stepCount);
-                }
-                else 
-                {
-                    gameTime.ElapsedGameTime = accumElapsedTime;
-                    gameTime.TotalGameTime += accumElapsedTime;
-                    accumElapsedTime = TimeSpan.Zero;
-
-                    GamePlatform.ProcessEvents();
-
-                    Input.Update();
-
-                    CurrentScene.Update(gameTime);
-
-                    Input.PostUpdate();
-
-                }
-
-                if (toggleFullscreenRequested)
-                {
+                if (toggleFullscreenRequested) {
                     toggleFullscreenRequested = false;
-                    GamePlatform.SetDisplayFullscreen(fullscreen);
-                }
-                else if (displayResizeRequested)
-                {
+                    GamePlatform.SetDisplayFullscreen (fullscreen);
+                } else if (displayResizeRequested) {
                     displayResizeRequested = false;
-                    GamePlatform.SetDisplaySize(requestedDisplaySize.Width, requestedDisplaySize.Height);
+                    GamePlatform.SetDisplaySize (requestedDisplaySize.Width, requestedDisplaySize.Height);
                 }
 
-                graphics.Begin();
+                graphics.Begin ();
 
-                CurrentScene.Draw(graphics);
+                Draw(graphics);
 
-                graphics.End();
+                graphics.End ();
 
             }
 
 #if DEBUG
 
-            var gen0 = GC.CollectionCount(0);
-            var gen1 = GC.CollectionCount(1);
-            var gen2 = GC.CollectionCount(2);
+            var gen0 = GC.CollectionCount (0);
+            var gen1 = GC.CollectionCount (1);
+            var gen2 = GC.CollectionCount (2);
 
-            Console.WriteLine(
+            Console.WriteLine (
                 $"Gen-0: {gen0.ToString()} | Gen-1: {gen1.ToString()} | Gen-2: {gen2.ToString()}"
             );
 #endif
         }
 
-        public void Quit()
-        {
+        public void Quit () {
             running = false;
         }
 
-        public void ToggleFullscreen()
-        {
+        public void ToggleFullscreen () {
             this.Fullscreen = !this.Fullscreen;
         }
 
-        public void Dispose()
-        {
-            ReleaseResources();
-            GC.SuppressFinalize(this);
+        public void Dispose () {
+            ReleaseResources ();
+            GC.SuppressFinalize (this);
         }
 
-        private void ReleaseResources()
-        {
-            Assets.Free();
-            GamePlatform.Shutdown();
+        private void ReleaseResources () {
+            Assets.Free ();
+            GamePlatform.Shutdown ();
         }
 
-        private void OnGamePlatformDisplayResized(object sender, Size e)
-        {
-            throw new NotImplementedException();
+        protected abstract void Load();
+
+        protected abstract void Update(float dt);
+
+        protected abstract void Draw(Graphics graphics);
+
+        private void OnGamePlatformDisplayResized (object sender, Size e) {
+            throw new NotImplementedException ();
         }
 
-        private void OnGamePlatformQuit(object sender, EventArgs e)
-        {
-            Quit();
+        private void OnGamePlatformQuit (object sender, EventArgs e) {
+            Quit ();
         }
     }
 }

@@ -14,7 +14,7 @@
 
         public abstract void End();
 
-        public abstract void Update(GameTime gameTime);
+        public abstract void Update(float dt);
 
         public abstract void Draw(Graphics graphics);
     }

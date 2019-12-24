@@ -154,5 +154,16 @@ namespace VortexCore
 
             return c;
         }
+
+        public static Color Lerp(Color value1, Color value2, float amount)
+        {
+            return new Color
+            (
+                Calc.Lerp(value1.R, value2.R, amount),
+                Calc.Lerp(value1.G, value2.G, amount),
+                Calc.Lerp(value1.B, value2.B, amount),
+                Calc.Lerp(value1.A, value2.A, amount)
+            );
+        }
     }
 }

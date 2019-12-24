@@ -8,9 +8,7 @@ namespace VortexCore
 
         public void End();
 
-        public void DrawTexture(Texture2D texture, float x, float y);
-
-        public void DrawTextureRegion(Texture2D texture, float x, float y, ref Rect sourceRect);
+        public void DrawQuad(Texture2D texture, ref Quad quad);
 
         public void FillRect(float x, float y, float w, float h, Color color);
 

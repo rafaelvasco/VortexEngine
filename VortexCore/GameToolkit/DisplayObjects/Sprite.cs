@@ -3,33 +3,68 @@
     public class Sprite : GameObject
     {
         private Texture2D texture;
-        private Rect sourceRect;
+        private Quad quad;
 
         public Sprite(Texture2D texture, Rect sourceRect = default)
         {
             this.texture = texture;
-            this.sourceRect = !sourceRect.IsEmpty ? sourceRect : new Rect(0, 0, texture.Width, texture.Height);
+            var region = !sourceRect.IsEmpty ? sourceRect : new Rect(0, 0, texture.Width, texture.Height);
+            this.quad = new Quad()
+            {
+                X = X,
+                Y = Y,
+                Width = region.Width,
+                Height = region.Height,
+                SrcX = region.X,
+                SrcY = region.Y,
+                SrcWidth = region.Width,
+                SrcHeight = region.Height,
+                Rotation = 0f,
+                FlipH = false,
+                FlipV = false,
+            };
+
+
         }
 
-        public override float Width => sourceRect.Width;
+        public override float Width => quad.Width;
 
-        public override float Height => sourceRect.Height;
+        public override float Height => quad.Height;
+
+        public bool FlipHorizontal
+        {
+            get => quad.FlipH;
+            set => quad.FlipH = value;
+            
+        }
+
+        public bool FlipVertical 
+        { 
+            get => quad.FlipV; 
+            set => quad.FlipH = value;
+        }
 
         public override void Draw(Graphics graphics, float parentX = 0, float parentY = 0)
         {
-            if(Visible)
+            if (Visible)
             {
-                graphics.DrawTextureRegion(texture, parentX + X, parentY + Y, ref sourceRect);
+                quad.X = parentX + X;
+                quad.Y = parentY + Y;
+                graphics.DrawQuad(texture, ref quad);
             }
-            
         }
 
         public void SetRegion(Rect sourceRect)
         {
-            this.sourceRect = sourceRect;
+            quad.SrcX = sourceRect.X;
+            quad.SrcY = sourceRect.Y;
+            quad.SrcWidth = sourceRect.Width;
+            quad.SrcHeight = sourceRect.Height;
+            quad.Width = sourceRect.Width;
+            quad.Height = sourceRect.Height;
         }
 
-        public override void Update()
+        public override void Update(float dt)
         {
         }
     }
