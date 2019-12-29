@@ -23,5 +23,6 @@ namespace VortexCore
         public bool FlipH;
 
         public bool FlipV;
+
     }
 }

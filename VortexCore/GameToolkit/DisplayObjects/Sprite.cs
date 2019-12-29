@@ -11,20 +11,18 @@
             var region = !sourceRect.IsEmpty ? sourceRect : new Rect(0, 0, texture.Width, texture.Height);
             this.quad = new Quad()
             {
-                X = X,
-                Y = Y,
+                X = this.X,
+                Y = this.Y,
                 Width = region.Width,
                 Height = region.Height,
                 SrcX = region.X,
                 SrcY = region.Y,
                 SrcWidth = region.Width,
                 SrcHeight = region.Height,
-                Rotation = 0f,
+                Rotation = this.Rotation,
                 FlipH = false,
                 FlipV = false,
             };
-
-
         }
 
         public override float Width => quad.Width;
@@ -35,12 +33,12 @@
         {
             get => quad.FlipH;
             set => quad.FlipH = value;
-            
+
         }
 
-        public bool FlipVertical 
-        { 
-            get => quad.FlipV; 
+        public bool FlipVertical
+        {
+            get => quad.FlipV;
             set => quad.FlipH = value;
         }
 
@@ -50,6 +48,7 @@
             {
                 quad.X = parentX + X;
                 quad.Y = parentY + Y;
+                quad.Rotation = this.Rotation;
                 graphics.DrawQuad(texture, ref quad);
             }
         }

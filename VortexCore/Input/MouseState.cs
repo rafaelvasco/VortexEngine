@@ -11,14 +11,11 @@
             {
                 if (value)
                 {
-                    if (value)
-                    {
-                        buttonState |= button;
-                    }
-                    else
-                    {
-                        buttonState &= ~button;
-                    }
+                    buttonState |= button;
+                }
+                else
+                {
+                    buttonState &= ~button;
                 }
             }
         }

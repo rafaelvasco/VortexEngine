@@ -1,7 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>VortexCore</AssemblyName>
+    <RootNamespace>VortexCore</RootNamespace>
     <LangVersion>8</LangVersion>
     <Title>VortexCore</Title>
     <Authors>Rafael Vasco</Authors>
@@ -21,6 +24,17 @@
     <ContentWithTargetPath Include="$(MSBuildThisFileDirectory)\Libs\Windows\bgfx_debug.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>bgfx_debug.dll</TargetPath>
+    </ContentWithTargetPath>
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' ">
+    <ContentWithTargetPath Include="$(MSBuildThisFileDirectory)\Libs\osx-x64\libSDL2.dylib">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>libSDL2.dylib</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="$(MSBuildThisFileDirectory)\Libs\osx-x64\libsokol_gfx.dylib">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>libsokol_gfx.dylib</TargetPath>
     </ContentWithTargetPath>
   </ItemGroup>
 

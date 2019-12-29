@@ -5,6 +5,12 @@ namespace VortexCore
 {
     public class GridMovement : Behavior
     {
+        public event ChangeDirectionFunc ChangedDirection;
+
+        public event BehaviorEventFunc StartedMoving;
+
+        public event BehaviorEventFunc StoppedMoving;
+
         public InputAction MoveLeft { get; private set; }
 
         public InputAction MoveRight { get; private set; }
@@ -21,11 +27,26 @@ namespace VortexCore
 
         public bool Moving { get; private set; }
 
+        public FourWayDirection Direction
+        {
+            get => currentDirection;
+            set 
+            {
+                if (currentDirection != value) 
+                {
+                    ChangedDirection?.Invoke(currentDirection, value);
+                    currentDirection = value;
+                }
+            }
+        }
+
         private float currentTargetX = 0.0f;
 
         private float currentTargetY = 0.0f;
 
         private Vector2Tween movementTween;
+
+        private FourWayDirection currentDirection;
 
 
         public GridMovement(bool activeOnStart) : base(activeOnStart)
@@ -40,37 +61,52 @@ namespace VortexCore
 
         }
 
-        public void OnMovementFinished() {
+        private void OnMovementFinished()
+        {
             Moving = false;
+            StoppedMoving?.Invoke();
         }
 
         public override void Update(float dt)
         {
+            if (!Enabled) 
+            {
+                return;
+            }
+
             if (!Moving)
             {
                 if (MoveLeft.WasPressed)
                 {
+                    Direction = FourWayDirection.Left;
                     Moving = true;
                     currentTargetX = AttachedActor.X - GridWidth;
                     currentTargetY = AttachedActor.Y;
+                    StartedMoving?.Invoke();
                 }
                 else if (MoveRight.WasPressed)
                 {
+                    Direction = FourWayDirection.Right;
                     Moving = true;
                     currentTargetX = AttachedActor.X + GridWidth;
                     currentTargetY = AttachedActor.Y;
+                    StartedMoving?.Invoke();
                 }
                 else if (MoveUp.WasPressed)
                 {
+                    Direction = FourWayDirection.Up;
                     Moving = true;
                     currentTargetX = AttachedActor.X;
                     currentTargetY = AttachedActor.Y - GridHeight;
+                    StartedMoving?.Invoke();
                 }
                 else if (MoveDown.WasPressed)
                 {
+                    Direction = FourWayDirection.Down;
                     Moving = true;
                     currentTargetX = AttachedActor.X;
                     currentTargetY = AttachedActor.Y + GridHeight;
+                    StartedMoving?.Invoke();
                 }
             }
             else

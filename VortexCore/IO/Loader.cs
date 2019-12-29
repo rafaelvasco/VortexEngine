@@ -26,7 +26,9 @@ namespace VortexCore
         {
             var pixmap = new Pixmap(imageData.Data, imageData.Width, imageData.Height);
 
-            var texture = GamePlatform.Graphics.CreateTexture(pixmap.DataPtr, pixmap.Width, pixmap.Height);
+            var texture = GamePlatform.Graphics.CreateTexture(pixmap);
+
+            pixmap.Dispose();
 
             texture.Id = imageData.Id;
 

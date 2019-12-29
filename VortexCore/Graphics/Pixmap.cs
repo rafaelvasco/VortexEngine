@@ -35,15 +35,15 @@ namespace VortexCore
             {
                 var pixelData = this.pixelData.data;
 
-                for(int i = 0; i < Width * Height; ++i)
+                for (int i = 0; i < Width * Height; ++i)
                 {
                     var idx = i * 4;
-                    
+
                     byte r = pixelData[idx];
                     byte g = pixelData[idx + 1];
                     byte b = pixelData[idx + 2];
                     byte a = pixelData[idx + 3];
-                    
+
                     pixelData[idx] = b;
                     pixelData[idx + 1] = g;
                     pixelData[idx + 2] = r;
@@ -52,9 +52,40 @@ namespace VortexCore
             }
         }
 
+        public void Fill(Color color)
+        {
+            var pd = pixelData.data;
+            byte r = color.Ri;
+            byte g = color.Gi;
+            byte b = color.Bi;
+            byte a = color.Ai;
+
+            unsafe 
+            {
+                fixed(byte* p = pd) 
+                {
+                    var len = pd.Length - 4;
+                    for(var i = 0; i <= len; i+=4) 
+                    {
+                        *(p + i) = b;
+                        *(p + i + 1) = g;
+                        *(p + i + 2) = r;
+                        *(p + i + 3) = a;
+                    }
+                }
+            }
+        }
+
         public void Dispose()
         {
             pixelData.Dispose();
+        }
+
+        public static Pixmap CreateFilled(int width, int height, Color fillColor)
+        {
+            var pixmap = new Pixmap(width, height);
+            pixmap.Fill(fillColor);
+            return pixmap;
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using SysPath = System.IO.Path;
 
 namespace VortexCore
@@ -31,7 +32,7 @@ namespace VortexCore
 
         public static Texture2D LoadTexture(string relativePath)
         {
-            var fullPath = SysPath.Combine(Path, relativePath);
+            var fullPath = BuildFullPath(relativePath);
 
             var id = SysPath.GetFileNameWithoutExtension(relativePath);
 
@@ -46,6 +47,11 @@ namespace VortexCore
 
             return texture;
 
+        }
+
+        private static string BuildFullPath(string relativePath) 
+        {
+            return SysPath.Combine(AppDomain.CurrentDomain.BaseDirectory, Path, relativePath);
         }
 
         internal static void Free()

@@ -23,11 +23,6 @@ namespace VortexCore
             CreateRenderer(width, height);
         }
 
-        private static void CreateRenderer(int width, int height)
-        {
-            Graphics = new Sdl2Graphics(width, height);
-        }
-
         private static void CreateDisplay(int width, int height, bool fullscreen)
         {
             SDL_WindowFlags displayFlags =
@@ -43,21 +38,20 @@ namespace VortexCore
             switch (GraphicsBackend)
             {
                 case GraphicsBackend.OpenGL:
-                    //SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_FLAGS, (int)SDL_GLcontext.SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-                    //SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_PROFILE_MASK, SDL_GLprofile.SDL_GL_CONTEXT_PROFILE_CORE);
+                    SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_FLAGS, (int)SDL_GLcontext.SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+                    SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_PROFILE_MASK, SDL_GLprofile.SDL_GL_CONTEXT_PROFILE_CORE);
                     SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
                     SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 3);
-                    //SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_DOUBLEBUFFER, 1);
+                    SDL_GL_SetAttribute(SDL_GLattr.SDL_GL_DOUBLEBUFFER, 1);
 
                     displayFlags |= SDL_WindowFlags.SDL_WINDOW_OPENGL;
 
                     break;
                 case GraphicsBackend.Metal:
-                    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
+                    
                     displayFlags |= SDL_WindowFlags.SDL_WINDOW_ALLOW_HIGHDPI;
                     break;
             }
-
 
             DisplayHandle = SDL_CreateWindow(
                 "VortexGame",
@@ -87,6 +81,19 @@ namespace VortexCore
                     break;
                 case Platform.MacOS:
                     NativeDisplayHandle = sysInfo.info.cocoa.window;
+                    break;
+            }
+        }
+
+        private static void CreateRenderer(int width, int height)
+        {
+            switch(GraphicsBackend) 
+            {
+                case GraphicsBackend.OpenGL: 
+                    Graphics = new Sdl2Graphics(GamePlatform.DisplayHandle, width, height);
+                    break;
+                case GraphicsBackend.Metal:
+                    Graphics = new SokolGraphics(GamePlatform.DisplayHandle, width, height);
                     break;
             }
         }
@@ -175,7 +182,7 @@ namespace VortexCore
             return platform switch
             {
                 Platform.Windows => GraphicsBackend.OpenGL,
-                Platform.MacOS => GraphicsBackend.OpenGL,
+                Platform.MacOS => GraphicsBackend.Metal,
                 Platform.Linux => GraphicsBackend.OpenGL,
                 _ => GraphicsBackend.OpenGL
             };

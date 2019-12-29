@@ -3,8 +3,11 @@ using System.Diagnostics;
 using System.Runtime;
 using System.Threading;
 
-namespace VortexCore {
-    public abstract class Game : IDisposable {
+namespace VortexCore
+{
+    public sealed class Game : IDisposable
+    {
+        public GameScene Scene { get; private set; }
 
         private bool running;
         private Size requestedDisplaySize;
@@ -16,53 +19,69 @@ namespace VortexCore {
         private bool showCursor = true;
         private readonly Graphics graphics;
 
-        public Size DisplaySize {
-            get => GamePlatform.GetDisplaySize ();
-            set {
-                var currentSize = GamePlatform.GetDisplaySize ();
+        public Size DisplaySize
+        {
+            get => GamePlatform.GetDisplaySize();
+            set
+            {
+                var currentSize = GamePlatform.GetDisplaySize();
 
-                if (value.Width == currentSize.Width && value.Height == currentSize.Height) {
+                if (value.Width == currentSize.Width && value.Height == currentSize.Height)
+                {
                     return;
                 }
 
-                if (running) {
+                if (running)
+                {
                     displayResizeRequested = true;
                     requestedDisplaySize = value;
-                } else {
-                    GamePlatform.SetDisplaySize (value.Width, value.Height);
+                }
+                else
+                {
+                    GamePlatform.SetDisplaySize(value.Width, value.Height);
                 }
             }
         }
 
-        public string Title {
-            get => GamePlatform.GetDisplayTitle ();
-            set {
-                GamePlatform.SetDisplayTitle (value);
+        public string Title
+        {
+            get => GamePlatform.GetDisplayTitle();
+            set
+            {
+                GamePlatform.SetDisplayTitle(value);
             }
         }
 
-        public bool Fullscreen {
-            get => GamePlatform.IsFullscreen ();
-            set {
-                if (GamePlatform.IsFullscreen () == value) {
+        public bool Fullscreen
+        {
+            get => GamePlatform.IsFullscreen();
+            set
+            {
+                if (GamePlatform.IsFullscreen() == value)
+                {
                     return;
                 }
-                if (running) {
+                if (running)
+                {
                     toggleFullscreenRequested = true;
 
-                } else {
-                    GamePlatform.SetDisplayFullscreen (value);
+                }
+                else
+                {
+                    GamePlatform.SetDisplayFullscreen(value);
                 }
 
                 fullscreen = value;
             }
         }
 
-        public bool ShowCursor {
+        public bool ShowCursor
+        {
             get => showCursor;
-            set {
+            set
+            {
                 showCursor = value;
-                GamePlatform.ShowCursor (showCursor);
+                GamePlatform.ShowCursor(showCursor);
             }
         }
 
@@ -70,37 +89,41 @@ namespace VortexCore {
 
         public double DesiredFrameRate { get; set; } = 60.0;
 
-        public float TimeScale { get; set; } = 1.0f;
-
-        public Game () {
-            GamePlatform.Initialize (800, 600, false);
+        public Game()
+        {
+            GamePlatform.Initialize(800, 600, false);
             GamePlatform.OnQuit += OnGamePlatformQuit;
             GamePlatform.DisplayResized += OnGamePlatformDisplayResized;
-            Assets.Initialize ();
+            Assets.Initialize();
             GameScene.Game = this;
             GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
-            Input.Init ();
+            Input.Init();
             graphics = GamePlatform.Graphics;
 
         }
 
-        ~Game () {
-            ReleaseResources ();
+        ~Game()
+        {
+            ReleaseResources();
         }
 
-        public void Start () {
-            if (running) {
+        public void Start(GameScene scene = null)
+        {
+            if (running)
+            {
                 return;
             }
 
-            GamePlatform.ShowDisplay (true);
+            Scene = scene;
 
-            Load();
+            GamePlatform.ShowDisplay(true);
+
+            Scene.Load();
 
 #if RELEASE
             try {
 #endif
-                Tick ();
+            Tick();
 
 #if RELEASE
             } catch (Exception e) {
@@ -109,17 +132,20 @@ namespace VortexCore {
 #endif
         }
 
-        private void LogException (Exception e) {
-            CrashLogHelper.LogToFile (e, this);
+        private void LogException(Exception e)
+        {
+            CrashLogHelper.LogToFile(e, this);
         }
 
-        private void Tick () {
+        private void Tick()
+        {
 
             running = true;
 
-            gameTimer = Stopwatch.StartNew ();
+            gameTimer = Stopwatch.StartNew();
 
-            while (running) {
+            while (running)
+            {
 
                 double desiredFrameTime = 1000.0 / DesiredFrameRate;
 
@@ -127,82 +153,88 @@ namespace VortexCore {
 
                 double deltaMilliseconds = (currentFrameTicks - previousFrameTicks) * (1000.0 / Stopwatch.Frequency);
 
-                while (LimitFrameRate && deltaMilliseconds < desiredFrameTime) {
-                    Thread.Sleep (0);
+                while (LimitFrameRate && deltaMilliseconds < desiredFrameTime)
+                {
+                    Thread.Sleep(0);
                     currentFrameTicks = gameTimer.ElapsedTicks;
                     deltaMilliseconds = (currentFrameTicks - previousFrameTicks) * (1000.0 / Stopwatch.Frequency);
                 }
 
                 previousFrameTicks = currentFrameTicks;
 
-                float deltaSeconds = (float) (deltaMilliseconds) / 1000.0f;
+                float deltaSeconds = (float)(deltaMilliseconds) / 1000.0f;
 
-                GamePlatform.ProcessEvents ();
+                GamePlatform.ProcessEvents();
 
-                Input.Update ();
+                Input.Update();
 
-                Update(deltaSeconds * TimeScale);
+                Scene.Update(deltaSeconds * Scene.TimeScale);
 
-                Input.PostUpdate ();
+                Input.PostUpdate();
 
-                if (toggleFullscreenRequested) {
+                if (toggleFullscreenRequested)
+                {
                     toggleFullscreenRequested = false;
-                    GamePlatform.SetDisplayFullscreen (fullscreen);
-                } else if (displayResizeRequested) {
+                    GamePlatform.SetDisplayFullscreen(fullscreen);
+                }
+                else if (displayResizeRequested)
+                {
                     displayResizeRequested = false;
-                    GamePlatform.SetDisplaySize (requestedDisplaySize.Width, requestedDisplaySize.Height);
+                    GamePlatform.SetDisplaySize(requestedDisplaySize.Width, requestedDisplaySize.Height);
                 }
 
-                graphics.Begin ();
+                graphics.Begin();
 
-                Draw(graphics);
+                Scene.Draw(graphics);
 
-                graphics.End ();
+                graphics.End();
+
+                graphics.Present();
 
             }
 
 #if DEBUG
 
-            var gen0 = GC.CollectionCount (0);
-            var gen1 = GC.CollectionCount (1);
-            var gen2 = GC.CollectionCount (2);
+            var gen0 = GC.CollectionCount(0);
+            var gen1 = GC.CollectionCount(1);
+            var gen2 = GC.CollectionCount(2);
 
-            Console.WriteLine (
+            Console.WriteLine(
                 $"Gen-0: {gen0.ToString()} | Gen-1: {gen1.ToString()} | Gen-2: {gen2.ToString()}"
             );
 #endif
         }
 
-        public void Quit () {
+        public void Quit()
+        {
             running = false;
         }
 
-        public void ToggleFullscreen () {
+        public void ToggleFullscreen()
+        {
             this.Fullscreen = !this.Fullscreen;
         }
 
-        public void Dispose () {
-            ReleaseResources ();
-            GC.SuppressFinalize (this);
+        public void Dispose()
+        {
+            ReleaseResources();
+            GC.SuppressFinalize(this);
         }
 
-        private void ReleaseResources () {
-            Assets.Free ();
-            GamePlatform.Shutdown ();
+        private void ReleaseResources()
+        {
+            Assets.Free();
+            GamePlatform.Shutdown();
         }
 
-        protected abstract void Load();
-
-        protected abstract void Update(float dt);
-
-        protected abstract void Draw(Graphics graphics);
-
-        private void OnGamePlatformDisplayResized (object sender, Size e) {
-            throw new NotImplementedException ();
+        private void OnGamePlatformDisplayResized(object sender, Size e)
+        {
+            throw new NotImplementedException();
         }
 
-        private void OnGamePlatformQuit (object sender, EventArgs e) {
-            Quit ();
+        private void OnGamePlatformQuit(object sender, EventArgs e)
+        {
+            Quit();
         }
     }
 }

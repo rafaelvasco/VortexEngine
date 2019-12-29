@@ -16,9 +16,20 @@ namespace VortexCore
 
         public float Y;
 
-        public virtual float Width { get; }
+        public float Rotation;
 
-        public virtual float Height { get; }
+        public Color Tint;
+
+        public float Alpha = 1.0f;
+
+        public abstract float Width { get; }
+
+        public abstract float Height { get; }
+
+        public RectF BoundingRect 
+        {
+            get => new RectF(X, Y, Width, Height);
+        }
 
         public bool Visible = true;
 

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace VortexCore
+namespace VortexCore.GLEW
 {
     public static class Glew
     {

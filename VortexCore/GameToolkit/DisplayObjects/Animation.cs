@@ -1,17 +1,28 @@
-﻿namespace VortexCore {
-    public class Animation : Sprite {
-        private Rect[] sourceRects;
-        private bool playing = true;
-        private int length;
-        private int index = 0;
+﻿namespace VortexCore
+{
+    public class Animation : Sprite
+    {
+        public int FrameIndex 
+        {
+            get => index;
+            set 
+            {
+                index = Calc.Clamp(value, 0, sourceRects.Length-1);
+                this.SetRegion(this.sourceRects[index]);
+            }
+        }
 
-        private float frameDeltaSeconds = 1 / 10f;
+        public bool Playing 
+        {
+            get => playing;
+            set => playing = value;
+        }
 
-        private float animTime = 0.0f;
-
-        public float Fps {
+        public float Fps
+        {
             get => 1 / frameDeltaSeconds;
-            set {
+            set
+            {
                 frameDeltaSeconds = 1 / value;
             }
         }
@@ -20,56 +31,63 @@
 
         public override float Height => sourceRects[index].Height;
 
-        public Animation (Spritesheet spritesheet): base(spritesheet.Texture) {
-            
+        private Rect[] sourceRects;
+        private bool playing = true;
+        private int index;
+        private float frameDeltaSeconds = 1 / 10f;
+        private float animTime;
+
+        public Animation(Spritesheet spritesheet) : base(spritesheet.Texture)
+        {
+
             this.sourceRects = new Rect[spritesheet.Regions.Length];
 
-            for (var i = 0; i < spritesheet.Regions.Length; ++i) {
+            for (var i = 0; i < spritesheet.Regions.Length; ++i)
+            {
                 this.sourceRects[i] = spritesheet[i];
             }
 
-            this.length = sourceRects.Length;
-
-            this.SetRegion(this.sourceRects[0]);
+            FrameIndex = 0;
+            
         }
 
-        public Animation (Spritesheet spritesheet, params int[] indices) : base(spritesheet.Texture) {
+        public Animation(Spritesheet spritesheet, params int[] indices) : base(spritesheet.Texture)
+        {
             this.sourceRects = new Rect[indices.Length];
 
-            for (var i = 0; i < indices.Length; ++i) {
+            for (var i = 0; i < indices.Length; ++i)
+            {
                 this.sourceRects[i] = spritesheet[indices[i]];
             }
 
-            this.length = sourceRects.Length;
-
             this.SetRegion(this.sourceRects[0]);
         }
 
-        public Animation (Spritesheet spritesheet, string[] frameNames) : base(spritesheet.Texture) {
+        public Animation(Spritesheet spritesheet, string[] frameNames) : base(spritesheet.Texture)
+        {
             this.sourceRects = new Rect[frameNames.Length];
 
-            for (var i = 0; i < frameNames.Length; ++i) {
+            for (var i = 0; i < frameNames.Length; ++i)
+            {
                 this.sourceRects[i] = spritesheet[frameNames[i]];
             }
 
             this.SetRegion(this.sourceRects[0]);
         }
 
-        public void Play () {
-            this.playing = true;
-
-            this.index = 0;
-        }
-
-        public override void Update (float dt) {
-            if (playing && sourceRects.Length > 1) {
+        public override void Update(float dt)
+        {
+            if (playing && sourceRects.Length > 1)
+            {
 
                 animTime += dt;
 
-                if (animTime > frameDeltaSeconds) {
+                if (animTime > frameDeltaSeconds)
+                {
                     index++;
 
-                    if (index > length - 1) {
+                    if (index > sourceRects.Length - 1)
+                    {
                         index = 0;
                     }
 

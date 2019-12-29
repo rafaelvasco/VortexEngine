@@ -9,7 +9,6 @@ namespace VortexCore
         public static event EventHandler<int> OnMouseScroll;
         public static event EventHandler<Point> OnMouseMove;
 
-
         private static MouseState mouseState;
 
         public static ref readonly MouseState GetMouseState()
@@ -51,6 +50,5 @@ namespace VortexCore
             MouseButton button = TranslatePlatformMouseButton(sdl_button);
             mouseState[button] = down;
         }
-
     }
 }

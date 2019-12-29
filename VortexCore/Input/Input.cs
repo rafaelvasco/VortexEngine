@@ -159,8 +159,6 @@ namespace VortexCore
             return !curMouseState[button] && prevMouseState[button];
         }
 
-
-
         private static void OnGamePlatformMouseMove(object sender, Point e)
         {
             mousePosition = e;
