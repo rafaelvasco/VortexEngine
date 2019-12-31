@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using static VortexCore.SDL;
 
 namespace VortexCore
@@ -21,31 +22,41 @@ namespace VortexCore
                     return runtimePlatform.Value;
                 }
 
-                var platformString = SDL_GetPlatform();
-                runtimePlatform = GetPlatformFrom(platformString);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) 
+                {
+                    runtimePlatform = Platform.Windows;
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) 
+                {
+                    runtimePlatform = Platform.OSX;
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) 
+                {
+                    runtimePlatform = Platform.Linux;
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)) 
+                {
+                    runtimePlatform = Platform.FreeBSD;
+                }
+                else 
+                {
+                    runtimePlatform = Platform.Unknown;
+                }
+
                 return runtimePlatform.Value;
             }
         }
 
-        private static Platform GetPlatformFrom(string @string)
-        {
-            return @string switch
-            {
-                "Windows" => Platform.Windows,
-                "Mac OS X" => Platform.MacOS,
-                "Linux" => Platform.Linux,
-                _ => Platform.Unknown
-            };
-        }
-
         public static void Initialize(int displayWidth, int displayHeight, bool fullscreen)
         {
+            Ensure64BitArchitecture();
+
             SDL_SetHint(SDL_HINT_WINDOWS_DISABLE_THREAD_NAMING, "1");
 
             if(SDL_Init(
                 SDL_INIT_VIDEO |
                 SDL_INIT_JOYSTICK |
-                SDL_INIT_GAMECONTROLLER |
+                SDL_INIT_GAMECONTROLLER | 
                 SDL_INIT_HAPTIC
             ) < 0)
             {
@@ -134,6 +145,15 @@ namespace VortexCore
                     case SDL_EventType.SDL_CONTROLLERDEVICEREMOVED:
                         break;
                 }
+            }
+        }
+
+        private static void Ensure64BitArchitecture()
+        {
+            var runtimeArchitecture = RuntimeInformation.OSArchitecture;
+            if (runtimeArchitecture == Architecture.Arm || runtimeArchitecture == Architecture.X86)
+            {
+                throw new NotSupportedException("32-bit architecture is not supported.");
             }
         }
     }

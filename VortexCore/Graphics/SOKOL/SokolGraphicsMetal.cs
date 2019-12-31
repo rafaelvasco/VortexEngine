@@ -1,3 +1,5 @@
+#if OSX
+
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -16,10 +18,13 @@ namespace VortexCore
 
             #include <metal_stdlib>
             using namespace metal;
+            struct params_t {
+                float4x4 mvp;
+            };
             struct vs_in {
-                float4 position [[attribute[0]]];
-                float2 uv [[attribute[1]]];
-                float4 color [[attribute[2]]];
+                float4 position [[attribute(0)]];
+                float2 uv [[attribute(1)]];
+                float4 color [[attribute(2)]];
                 
             };
             struct vs_out {
@@ -27,9 +32,9 @@ namespace VortexCore
                 float2 uv;
                 float4 color;
             };
-            vertex vs_out _main(vs_in in [[stage_in]]) {
+            vertex vs_out _main(vs_in in [[stage_in]], constant params_t& params [[buffer(0)]]) {
                 vs_out out;
-                out.position = in.position;
+                out.position = params.mvp * in.position;
                 out.uv = in.uv;
                 out.color = in.color;
                 return out;
@@ -44,11 +49,10 @@ namespace VortexCore
             struct fs_in {
                 float2 uv;
                 float4 color;
-            }
+            };
             fragment float4 _main(fs_in in [[stage_in]], texture2d<float> tex [[texture(0)]], sampler smp [[sampler(0)]]) {
                 return tex.sample(smp, in.uv) * in.color;
-            }
-
+            };
         ";
 
         private static SokolGraphics instance;
@@ -57,36 +61,22 @@ namespace VortexCore
         private MTLRenderPassDescriptor renderPassDescriptor;
         private CAMetalLayer metalLayer;
 
+        private GCHandle getMetalRenderPassDescriptorGCHandle;
+        private GCHandle getMetalDrawableGCHandle;
+
+
+
+
         bool Graphics.VSyncEnabled 
         { 
             get => metalLayer.displaySyncEnabled; 
             set => metalLayer.displaySyncEnabled = value; 
         }
 
-        private static IntPtr ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
-        {
-            libraryName = libraryName.ToLower() switch
-            {
-                "sokol_gfx" => "sokol_gfx",
-                _ => libraryName
-            };
+        
 
-            return NativeLibrary.Load(libraryName, assembly, searchPath);
-        }
 
-        private static IntPtr GetMTLRenderPassDescriptor()
-        {
-            // This callback is invoked by sokol_gfx native library in `sg_begin_default_pass()`
-            return instance.GetMetalRenderPassDescriptor();
-        }
-
-        private static IntPtr GetMTLDrawable()
-        {
-            // This callback is invoked by sokol_gfx native library in `sg_end_pass()` for the default pass
-            return instance.drawable;
-        }
-
-        private void ImplInitialize(ref SgDeviceDescription deviceDescription, IntPtr windowHandle) 
+        private void ImplInitialize(ref sg_desc deviceDescription, IntPtr windowHandle) 
         {
             instance = this;
 
@@ -107,10 +97,17 @@ namespace VortexCore
                 displaySyncEnabled = true
             };
 
-            deviceDescription.GraphicsBackend = SOKOL.GraphicsBackend.Metal;
-            deviceDescription.MetalDevice = metalLayer.device;
-            deviceDescription.GetMetalRenderPassDescriptor = GetMTLRenderPassDescriptor;
-            deviceDescription.GetMetalDrawable = GetMTLDrawable;
+            var getMetalRenderPassDescriptor = new GetPointerDelegate(StaticGetMetalRenderPassDescriptor);
+            var getMetalDrawable = new GetPointerDelegate(StaticGetMetalDrawable);
+            
+            getMetalRenderPassDescriptorGCHandle = GCHandle.Alloc(getMetalRenderPassDescriptor);
+            getMetalDrawableGCHandle = GCHandle.Alloc(getMetalDrawable);
+
+            deviceDescription.mtl_device = (void*) metalLayer.device.Handle;
+            deviceDescription.mtl_renderpass_descriptor_cb = (void*) Marshal.GetFunctionPointerForDelegate(getMetalRenderPassDescriptor);
+            deviceDescription.mtl_drawable_cb = (void*) Marshal.GetFunctionPointerForDelegate(getMetalDrawable);
+
+            //deviceDescription.GraphicsBackend = SOKOL.GraphicsBackend.Metal;
 
             NativeLibrary.SetDllImportResolver(typeof(sokol_gfx).Assembly, ResolveLibrary);
 
@@ -123,30 +120,9 @@ namespace VortexCore
             };
         }
 
-        private void ImplInitializeShaders() 
-        {
-            //shader = new SgShader(BaseVertexShaderSource, BaseFragShaderSource);
-        }
+        
 
-        private IntPtr GetMetalRenderPassDescriptor()
-        {
-            if (drawable.Handle != IntPtr.Zero)
-            {
-                NSObject.release(drawable);
-            }
-            drawable = metalLayer.nextDrawable();
-
-            if (renderPassDescriptor != IntPtr.Zero)
-            {
-                NSObject.release(renderPassDescriptor);
-            }
-            renderPassDescriptor = MTLRenderPassDescriptor.New();
-
-            var colorAttachment = renderPassDescriptor.colorAttachments[0];
-            colorAttachment.texture = drawable.texture;
-
-            return renderPassDescriptor;
-        }
+        
 
         private (int width, int height) ImplGetRenderSize() 
         {
@@ -167,6 +143,61 @@ namespace VortexCore
             {
                 NSObject.release(metalLayer);
             }
+
+            if (getMetalRenderPassDescriptorGCHandle.IsAllocated)
+            {
+                getMetalRenderPassDescriptorGCHandle.Free();
+            }
+
+            if (getMetalDrawableGCHandle.IsAllocated)
+            {
+                getMetalDrawableGCHandle.Free();
+            }
+        }
+
+        private static IntPtr ResolveLibrary(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            libraryName = libraryName.ToLower() switch
+            {
+                "sokol_gfx" => "sokol_gfx",
+                _ => libraryName
+            };
+
+            return NativeLibrary.Load(libraryName, assembly, searchPath);
+        }
+
+        private static IntPtr StaticGetMetalRenderPassDescriptor()
+        {
+            // This callback is invoked by sokol_gfx native library in `sg_begin_default_pass()`
+            return instance.GetMetalRenderPassDescriptor();
+        }
+        
+        private static IntPtr StaticGetMetalDrawable()
+        {
+            // This callback is invoked by sokol_gfx native library in `sg_end_pass()` for the default pass
+            return instance.drawable;
+        }
+
+        private IntPtr GetMetalRenderPassDescriptor()
+        {
+            if (drawable.Handle != IntPtr.Zero)
+            {
+                NSObject.release(drawable);
+            }
+            drawable = metalLayer.nextDrawable();
+            
+            if (renderPassDescriptor != IntPtr.Zero)
+            {
+                NSObject.release(renderPassDescriptor);
+            }
+            renderPassDescriptor = MTLRenderPassDescriptor.New();
+            
+            var colorAttachment = renderPassDescriptor.colorAttachments[0];
+            colorAttachment.texture = drawable.texture;
+
+            return renderPassDescriptor; 
         }
     }
 }
+
+#endif

@@ -1,58 +1,92 @@
 using System;
 using System.Numerics;
-using VortexCore.SOKOL;
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using static VortexCore.SOKOL.sokol_gfx;
 
 namespace VortexCore
 {
     internal unsafe partial class SokolGraphics : Graphics
     {
-        public static readonly int MaxVertexCount = 4;
+        public static readonly int MaxVertexCount = 64;
 
         private GraphicsInfo info;
 
-        private readonly SgDevice graphicsDevice;
+        private sg_pipeline pipeline;
 
-        private readonly SgPipeline pipeline;
+        private sg_bindings bindings;
 
-        private readonly SgBindings bindings = new SgBindings();
+        private sg_buffer vertexBuffer;
 
-        private readonly SgBuffer vertexBuffer;
+        private sg_buffer indexBuffer;
 
-        private readonly SgBuffer indexBuffer;
-
-        private SgShader shader;
+        private sg_shader shader;
 
         private sg_pass_action clearAction;
 
         private SokolVertex[] vertices;
 
-        private int vertexIndex = 0;
+        private int quadCount = 0;
 
         private Texture2D onePxTexture;
 
         private Texture2D currentTexture;
 
+        private Matrix4x4 transform;
+
+        private Matrix4x4 projection;
+
+        private Matrix4x4 renderMatrix;
+
+        private int renderWidth;
+
+        private int renderHeight;
+
         public GraphicsInfo Info => info;
 
-        internal SokolGraphics(IntPtr windowHandle, int width, int height)
+
+        internal SokolGraphics(IntPtr windowHandle)
         {
-            var graphicsDeviceDescr = new SgDeviceDescription();
+            InitializeGraphicsDevice(windowHandle);
+
+            InitializeBufferBindings();
+
+            InitializeBasePipeline();
+
+            InitializeBaseStateAndResources();
+        }
+
+        private void InitializeGraphicsDevice(IntPtr windowHandle)
+        {
+            var graphicsDeviceDescr = new sg_desc();
 
             ImplInitialize(ref graphicsDeviceDescr, windowHandle);
 
-            graphicsDevice = new SgDevice(ref graphicsDeviceDescr);
+            sg_setup(ref graphicsDeviceDescr);
 
-            this.info.Driver = graphicsDevice.GraphicsBackend.ToString();
+            var driverInfo = sg_query_backend();
 
+            this.info.Driver = driverInfo.ToString();
+        }
+
+        private void InitializeBufferBindings()
+        {
             vertices = new SokolVertex[MaxVertexCount];
-            vertexBuffer = new SgBuffer<SokolVertex>(SgBufferType.Vertex, SgBufferUsage.Dynamic, vertices);
 
-            var indices = new ushort[MaxVertexCount / 4 * 6];
+            var vertexBufferDesc = new sg_buffer_desc();
+            vertexBufferDesc.usage = sg_usage.SG_USAGE_STREAM;
+            vertexBufferDesc.type = sg_buffer_type.SG_BUFFERTYPE_VERTEXBUFFER;
+            vertexBufferDesc.size = SokolVertex.SizeInBytes * vertices.Length;
+
+            vertexBuffer = sg_make_buffer(ref vertexBufferDesc);
+
+            var indicesLen = MaxVertexCount / 4 * 6;
+
+            var indices = stackalloc ushort[MaxVertexCount / 4 * 6];
 
             ushort indice_i = 0;
 
-            for (var i = 0; i < indices.Length; i += 6, indice_i += 4)
+            for (var i = 0; i < indicesLen; i += 6, indice_i += 4)
             {
                 indices[i + 0] = (ushort)(indice_i + 0);
                 indices[i + 1] = (ushort)(indice_i + 1);
@@ -62,145 +96,216 @@ namespace VortexCore
                 indices[i + 5] = (ushort)(indice_i + 3);
             }
 
-            indexBuffer = new SgBuffer<ushort>(SgBufferType.Index, SgBufferUsage.Immutable, indices);
+            var indexBufferDesc = new sg_buffer_desc();
+            indexBufferDesc.usage = sg_usage.SG_USAGE_IMMUTABLE;
+            indexBufferDesc.type = sg_buffer_type.SG_BUFFERTYPE_INDEXBUFFER;
+            indexBufferDesc.content = indices;
+            indexBufferDesc.size = Unsafe.SizeOf<ushort>() * indicesLen;
 
-            bindings.SetVertexBuffer(0, vertexBuffer);
-            bindings.SetIndexBuffer(indexBuffer);
-            
-            ImplInitializeShaders();
+            indexBuffer = sg_make_buffer(ref indexBufferDesc);
 
-            pipeline = new SgPipeline(shader, new[]
+            bindings.vertex_buffer(0) = vertexBuffer;
+            bindings.index_buffer = indexBuffer;
+
+        }
+
+        private void InitializeBasePipeline()
+        {
+            var shaderDescr = new sg_shader_desc();
+            shaderDescr.vs.uniformBlock(0).size = Unsafe.SizeOf<Matrix4x4>();
+
+            ref var mvpUniform = ref shaderDescr.vs.uniformBlock(0).uniform(0);
+            mvpUniform.name = (byte*) Marshal.StringToHGlobalAnsi("mvp");
+            mvpUniform.type = sg_uniform_type.SG_UNIFORMTYPE_MAT4;
+
+            shaderDescr.fs.image(0).type = sg_image_type.SG_IMAGETYPE_2D;
+
+            shaderDescr.vs.source = (byte*)Marshal.StringToHGlobalAnsi(BaseVertexShaderSource);
+            shaderDescr.fs.source = (byte*)Marshal.StringToHGlobalAnsi(BaseFragShaderSource);
+
+            shader = sg_make_shader(ref shaderDescr);
+
+            Marshal.FreeHGlobal((IntPtr)shaderDescr.vs.uniformBlock(0).uniform(0).name);
+            Marshal.FreeHGlobal((IntPtr)shaderDescr.vs.source);
+            Marshal.FreeHGlobal((IntPtr)shaderDescr.fs.source);
+
+            var quadPipelineDescr = new sg_pipeline_desc();
+            quadPipelineDescr.layout.attr(0).format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT3;
+            quadPipelineDescr.layout.attr(1).format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT2;
+            quadPipelineDescr.layout.attr(2).format = sg_vertex_format.SG_VERTEXFORMAT_FLOAT4;
+            quadPipelineDescr.index_type = sg_index_type.SG_INDEXTYPE_UINT16;
+            quadPipelineDescr.shader = shader;
+            quadPipelineDescr.primitive_type = sg_primitive_type.SG_PRIMITIVETYPE_TRIANGLES;
+            quadPipelineDescr.blend.enabled = true;
+            quadPipelineDescr.blend.color_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8;
+            quadPipelineDescr.blend.src_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_SRC_ALPHA;
+            quadPipelineDescr.blend.dst_factor_rgb = sg_blend_factor.SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+            quadPipelineDescr.blend.src_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ONE;
+            quadPipelineDescr.blend.dst_factor_alpha = sg_blend_factor.SG_BLENDFACTOR_ZERO;
+            // quadPipelineDescr.depth_stencil.depth_compare_func = sg_compare_func.SG_COMPAREFUNC_LESS_EQUAL;
+            // quadPipelineDescr.depth_stencil.depth_write_enabled = true;
+            // quadPipelineDescr.rasterizer.cull_mode = sg_cull_mode.SG_CULLMODE_BACK;
+            quadPipelineDescr.rasterizer.sample_count = 4;
+
+            pipeline = sg_make_pipeline(ref quadPipelineDescr);
+
+            if (pipeline.id == SG_INVALID_ID)
             {
-                sg_vertex_format.SG_VERTEXFORMAT_FLOAT3,
-                sg_vertex_format.SG_VERTEXFORMAT_FLOAT2,
-                sg_vertex_format.SG_VERTEXFORMAT_FLOAT4
-            }, sg_index_type.SG_INDEXTYPE_UINT16);
+                throw new Exception("Error while creating Metal Pipeline: Invalid Id");
+            }
 
-            clearAction = new sg_pass_action();
-            clearAction.GetColors()[0] = new sg_color_attachment_action()
-            {
-                action = sg_action.SG_ACTION_CLEAR,
-                val = Color.Orange
-            };
+            clearAction = sg_pass_action.clear(Colors.Black);
+        }
 
-            var pixmap = Pixmap.CreateFilled(1, 1, Color.White);
-            onePxTexture = (SokolTexture) ImplCreateTexture(pixmap);
+        private void InitializeBaseStateAndResources()
+        {
+            var (width, height) = ImplGetRenderSize();
+
+            this.renderWidth = width;
+            this.renderHeight = height;
+
+            var pixmap = Pixmap.CreateFilled(1, 1, Colors.White);
+            onePxTexture = (SokolTexture)ImplCreateTexture(pixmap);
             pixmap.Dispose();
 
-            bindings.SetFragShaderImage(onePxTexture.IndexHandle);
+            projection = Matrix4x4.CreateOrthographicOffCenter
+            (
+                0f,
+                renderWidth,
+                renderHeight,
+                0f,
+                0.0f,
+                1.0f
+            );
 
+            transform = Matrix4x4.Identity;
+
+            renderMatrix = projection * transform;
+
+            SetCurrentTexture(onePxTexture);
         }
 
         void Graphics.Begin()
         {
-            var (width, height) = ImplGetRenderSize();
-            
-            sg_begin_default_pass(ref clearAction, width, height);
-
-            pipeline.Apply();
-            bindings.Apply();
+            sg_begin_default_pass(ref clearAction, this.renderWidth, this.renderHeight);
+            sg_apply_pipeline(pipeline);
         }
 
         void Graphics.End()
         {
             Flush();
-            sg_end_pass();
         }
 
-        private void Flush() 
+        private void Flush()
         {
-            if(vertexIndex > 0) 
+            if (quadCount > 0)
             {
-                vertexIndex = 0;
-                sg_draw(0, vertexIndex, 1);
+                fixed (void* vertexPointer = vertices)
+                {
+                    sg_update_buffer(vertexBuffer, vertexPointer, (quadCount * 4) * SokolVertex.SizeInBytes);
+                }
+
+                sg_apply_bindings(ref bindings);
+
+                var mvpMatrix = Unsafe.AsPointer(ref renderMatrix);
+                sg_apply_uniforms(sg_shader_stage.SG_SHADERSTAGE_VS, 0, mvpMatrix, Unsafe.SizeOf<Matrix4x4>());
+                sg_draw(0, quadCount * 6, 1);
+                quadCount = 0;
+
             }
         }
 
         void Graphics.DrawQuad(Texture2D texture, ref Quad quad)
         {
-            if (currentTexture.IndexHandle != texture.IndexHandle) 
+            if (currentTexture != null && currentTexture.IndexHandle != texture.IndexHandle)
             {
                 Flush();
-                bindings.SetFragShaderImage(texture.IndexHandle);
-                currentTexture = texture;
+                SetCurrentTexture(texture);
             }
-
-            int vtxIdx = vertexIndex;
 
             float x1 = quad.X;
             float y1 = quad.Y;
             float x2 = quad.X + quad.Width;
             float y2 = quad.Y + quad.Height;
 
-            float invTexWidth = 1/texture.Width;
-            float invTexHeight = 1/texture.Height;
+            float invTexWidth = 1.0f / texture.Width;
+            float invTexHeight = 1.0f / texture.Height;
 
             float u = quad.SrcX * invTexWidth;
             float v = quad.SrcY * invTexHeight;
             float u2 = (quad.SrcX + quad.SrcWidth) * invTexWidth;
             float v2 = (quad.SrcY + quad.SrcHeight) * invTexHeight;
 
-            this.vertices[vtxIdx] = new SokolVertex
-            (
-                new Vector3(x1, y1, 0.0f),
-                Color.White,
-                new Vector2(u, v)    
-            );
-            this.vertices[vtxIdx+1] = new SokolVertex
-            (
-                new Vector3(x2, y1, 0.0f),
-                Color.White,
-                new Vector2(u2, v)    
-            );
-            this.vertices[vtxIdx+2] = new SokolVertex
-            (
-                new Vector3(x2, y2, 0.0f),
-                Color.White,
-                new Vector2(u2, v2)    
-            );
-            this.vertices[vtxIdx+3] = new SokolVertex
-            (
-                new Vector3(x1, y2, 0.0f),
-                Color.White,
-                new Vector2(u, v2)    
-            );
-            this.vertexIndex += 4;
+            var col = quad.Color;
+
+            fixed (SokolVertex* fixedVertexPointer = vertices)
+            {
+                var vertexPointer = fixedVertexPointer + quadCount++ * 4;
+
+                vertexPointer[0].Position = new Vector3(x1, y1, 0f);
+                vertexPointer[0].Uv = new Vector2(u, v);
+                vertexPointer[0].Color = col;
+
+                vertexPointer[1].Position = new Vector3(x2, y1, 0f);
+                vertexPointer[1].Uv = new Vector2(u2, v);
+                vertexPointer[1].Color = col;
+
+                vertexPointer[2].Position = new Vector3(x2, y2, 0f);
+                vertexPointer[2].Uv = new Vector2(u2, v2);
+                vertexPointer[2].Color = col;
+
+                vertexPointer[3].Position = new Vector3(x1, y2, 0f);
+                vertexPointer[3].Uv = new Vector2(u, v2);
+                vertexPointer[3].Color = col;
+            }
         }
 
         void Graphics.FillRect(float x, float y, float w, float h, Color color)
         {
 
-            int vtxIdx = vertexIndex;
+            if (currentTexture != null && currentTexture.IndexHandle != onePxTexture.IndexHandle)
+            {
+                Flush();
+                SetCurrentTexture(onePxTexture);
+            }
 
-            this.vertices[vtxIdx] = new SokolVertex
-            (
-                new Vector3(x, y, 0.0f),
-                Color.White,
-                new Vector2(0.0f, 0.0f)    
-            );
-            this.vertices[vtxIdx+1] = new SokolVertex
-            (
-                new Vector3(x+w, y, 0.0f),
-                Color.White,
-                new Vector2(0.0f, 1.0f)    
-            );
-            this.vertices[vtxIdx+2] = new SokolVertex
-            (
-                new Vector3(x+w, y+h, 0.0f),
-                Color.White,
-                new Vector2(1.0f, 1.0f)    
-            );
-            this.vertices[vtxIdx+3] = new SokolVertex
-            (
-                new Vector3(x, y+h, 0.0f),
-                Color.White,
-                new Vector2(0.0f, 1.0f)    
-            );
-            this.vertexIndex += 4;
+            float x1 = x;
+            float y1 = y;
+            float x2 = x + w;
+            float y2 = y + h;
+
+            fixed (SokolVertex* fixedVertexPointer = vertices)
+            {
+                var vertexPointer = fixedVertexPointer + quadCount++ * 4;
+
+                vertexPointer[0].Position = new Vector3(x1, y1, 0f);
+                vertexPointer[0].Uv = new Vector2(0, 0);
+                vertexPointer[0].Color = color;
+
+                vertexPointer[1].Position = new Vector3(x2, y1, 0f);
+                vertexPointer[1].Uv = new Vector2(1, 0);
+                vertexPointer[1].Color = color;
+
+                vertexPointer[2].Position = new Vector3(x2, y2, 0f);
+                vertexPointer[2].Uv = new Vector2(1, 1);
+                vertexPointer[2].Color = color;
+
+                vertexPointer[3].Position = new Vector3(x1, y2, 0f);
+                vertexPointer[3].Uv = new Vector2(0, 1);
+                vertexPointer[3].Color = color;
+            }
+        }
+
+        private void SetCurrentTexture(Texture2D texture, int slot = 0)
+        {
+            bindings.fs_image(0) = texture.IndexHandle;
+            //sg_apply_bindings(ref bindings);
+            currentTexture = texture;
         }
 
         void Graphics.Present()
         {
+            sg_end_pass();
             sg_commit();
         }
 
@@ -209,21 +314,30 @@ namespace VortexCore
             return ImplCreateTexture(pixmap);
         }
 
-        private Texture2D ImplCreateTexture(Pixmap pixmap) 
+        private Texture2D ImplCreateTexture(Pixmap pixmap)
         {
-            var sokolTextureContent = new sg_image_content();
-            sokolTextureContent.GetSubimage()[0].ptr = (void*)pixmap.DataPtr;
-            sokolTextureContent.GetSubimage()[0].size = pixmap.Width * pixmap.Height * pixmap.Pitch;
-            
-            var sokolTexDescr = new sg_image_desc() 
+            var imageDescr = new sg_image_desc()
             {
+                usage = sg_usage.SG_USAGE_IMMUTABLE,
+                type = sg_image_type.SG_IMAGETYPE_2D,
                 width = pixmap.Width,
                 height = pixmap.Height,
-                content = sokolTextureContent
+                depth = 1,
+                num_mipmaps = 1,
+                min_filter = sg_filter.SG_FILTER_NEAREST,
+                mag_filter = sg_filter.SG_FILTER_NEAREST,
+                wrap_u = sg_wrap.SG_WRAP_REPEAT,
+                wrap_v = sg_wrap.SG_WRAP_REPEAT,
+                pixel_format = sg_pixel_format.SG_PIXELFORMAT_RGBA8
             };
-            var sokolTexture = sg_make_image(ref sokolTexDescr);
 
-            var texture2d = new SokolTexture(sokolTexture);
+            ref var subImage = ref imageDescr.content.subimage(0, 0);
+            subImage.ptr = (void*)pixmap.DataPtr;
+            subImage.size = pixmap.Width * pixmap.Height * pixmap.Pitch;
+
+            var sokolImage = sg_make_image(ref imageDescr);
+
+            var texture2d = new SokolTexture(sokolImage, pixmap.Width, pixmap.Height);
 
             return texture2d;
         }
@@ -235,6 +349,8 @@ namespace VortexCore
 
         void Graphics.ReleaseResources()
         {
+            sg_shutdown();
+
             ImplReleaseResources();
         }
     }

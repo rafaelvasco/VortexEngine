@@ -1,4 +1,6 @@
-﻿namespace VortexCore
+﻿using System.Numerics;
+
+namespace VortexCore
 {
     public static class ColorUtils
     {
@@ -12,15 +14,16 @@
                 return new Color(0, 0, 0, 0);
             }
 
-            Color res;
             float baseA = baseColor.A;
             float overA = overColor.A;
-            res.R = (baseColor.R * baseA * sa + overColor.R * overA) / alpha;
-            res.G = (baseColor.G * baseA * sa + overColor.G * overA) / alpha;
-            res.B = (baseColor.B * baseA * sa + overColor.B * overA) / alpha;
-            res.A = alpha;
 
-            return res;
+            return new Color
+            (
+                (baseColor.R * baseA * sa + overColor.R * overA) / alpha,
+                (baseColor.G * baseA * sa + overColor.G * overA) / alpha,
+                (baseColor.B * baseA * sa + overColor.B * overA) / alpha,
+                alpha
+            );
         }
     
         public static Color Darkened(Color color, float amount)

@@ -8,8 +8,6 @@ namespace VortexCore
     {
         public static IntPtr DisplayHandle { get; private set; }
 
-        public static IntPtr NativeDisplayHandle { get; private set; }
-
         public static GraphicsBackend GraphicsBackend { get; private set; }
 
         public static event EventHandler<Size> DisplayResized;
@@ -28,7 +26,8 @@ namespace VortexCore
             SDL_WindowFlags displayFlags =
              SDL_WindowFlags.SDL_WINDOW_HIDDEN |
              SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS |
-             SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS;
+             SDL_WindowFlags.SDL_WINDOW_MOUSE_FOCUS |
+             SDL_WindowFlags.SDL_WINDOW_ALLOW_HIGHDPI;
 
             if (fullscreen)
             {
@@ -47,10 +46,6 @@ namespace VortexCore
                     displayFlags |= SDL_WindowFlags.SDL_WINDOW_OPENGL;
 
                     break;
-                case GraphicsBackend.Metal:
-                    
-                    displayFlags |= SDL_WindowFlags.SDL_WINDOW_ALLOW_HIGHDPI;
-                    break;
             }
 
             DisplayHandle = SDL_CreateWindow(
@@ -66,23 +61,6 @@ namespace VortexCore
             {
                 throw new ApplicationException("Error while creating SDL2 Display: " + SDL_GetError());
             }
-
-            var sysInfo = new SDL_SysWMinfo();
-
-            SDL_GetWindowWMInfo(DisplayHandle, ref sysInfo);
-
-            switch (RuntimePlatform)
-            {
-                case Platform.Windows:
-                    NativeDisplayHandle = sysInfo.info.win.window;
-                    break;
-                case Platform.Linux:
-                    NativeDisplayHandle = sysInfo.info.x11.window;
-                    break;
-                case Platform.MacOS:
-                    NativeDisplayHandle = sysInfo.info.cocoa.window;
-                    break;
-            }
         }
 
         private static void CreateRenderer(int width, int height)
@@ -90,10 +68,10 @@ namespace VortexCore
             switch(GraphicsBackend) 
             {
                 case GraphicsBackend.OpenGL: 
-                    Graphics = new Sdl2Graphics(GamePlatform.DisplayHandle, width, height);
+                    Graphics = new Sdl2Graphics(GamePlatform.DisplayHandle);
                     break;
                 case GraphicsBackend.Metal:
-                    Graphics = new SokolGraphics(GamePlatform.DisplayHandle, width, height);
+                    Graphics = new SokolGraphics(GamePlatform.DisplayHandle);
                     break;
             }
         }
@@ -181,9 +159,11 @@ namespace VortexCore
         {
             return platform switch
             {
-                Platform.Windows => GraphicsBackend.OpenGL,
-                Platform.MacOS => GraphicsBackend.Metal,
+                Platform.Windows => GraphicsBackend.OpenGL, //TODO: Direct3D
+                Platform.OSX => GraphicsBackend.Metal,
                 Platform.Linux => GraphicsBackend.OpenGL,
+                Platform.FreeBSD => GraphicsBackend.OpenGL,
+                Platform.Unknown => GraphicsBackend.OpenGL,
                 _ => GraphicsBackend.OpenGL
             };
         }

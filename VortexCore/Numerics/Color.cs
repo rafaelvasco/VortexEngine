@@ -1,4 +1,27 @@
-﻿using System;
+﻿/* Adapted from https://github.com/lithiumtoast/sokol-sharp/blob/develop/src/Sokol.Graphics/RgbaFloat.cs and */
+/* from https://github.com/mellinoe/veldrid/blob/master/src/Veldrid/RgbaFloat.cs */
+/* 
+MIT License
+Copyright (c) 2019 Rafael Vasco
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
+using System;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -6,75 +29,49 @@ namespace VortexCore
 {
     public struct Color : IEquatable<Color>
     {
+        private readonly Vector4 channels;
+        public float R => channels.X;
+        public float G => channels.Y;
+        public float B => channels.Z;
+        public float A => channels.W;
 
-        public static readonly Color Red = new Color(1, 0, 0, 1);
-        public static readonly Color DarkRed = new Color(0.6f, 0, 0, 1);
-        public static readonly Color Green = new Color(0, 1, 0, 1);
-        public static readonly Color Blue = new Color(0, 0, 1, 1);
-        public static readonly Color Yellow = new Color(1, 1, 0, 1);
-        public static readonly Color Grey = new Color(.25f, .25f, .25f, 1);
-        public static readonly Color LightGrey = new Color(.65f, .65f, .65f, 1);
-        public static readonly Color Cyan = new Color(0, 1, 1, 1);
-        public static readonly Color White = new Color(1, 1, 1, 1);
-        public static readonly Color CornflowerBlue = new Color(0.3921f, 0.5843f, 0.9294f, 1);
-        public static readonly Color Clear = new Color(0, 0, 0, 0);
-        public static readonly Color Black = new Color(0, 0, 0, 1);
-        public static readonly Color Pink = new Color(1f, 0.45f, 0.75f, 1);
-        public static readonly Color Orange = new Color(1f, 0.36f, 0f, 1);
+        public byte Rb => (byte)MathF.Round(channels.X * 255.0f); 
+        public byte Gb => (byte)MathF.Round(channels.Y * 255.0f); 
+        public byte Bb => (byte)MathF.Round(channels.Z * 255.0f); 
+        public byte Ab => (byte)MathF.Round(channels.W * 255.0f); 
+     
 
-
-        public float R;
-        public float G;
-        public float B;
-        public float A;
-
-        public byte Ri => (byte)(R * 255);
-        public byte Gi => (byte)(G * 255);
-        public byte Bi => (byte)(B * 255);
-        public byte Ai => (byte)(A * 255);
-
-
-        public Color(float r, float g, float b, float a)
+        public Color(float r, float g, float b, float a = 1f)
         {
-            R = r;
-            G = g;
-            B = b;
-            A = a;
+            channels = new Vector4(r, g, b, a);
         }
+
 
         public Color(float v, float a = 1.0f)
         {
-            R = v;
-            G = v;
-            B = v;
-            A = a;
+            channels = new Vector4(v, v, v, a);
         }
-
-        public Color(int rgba)
-        {
-            A = (rgba & 0xFF) / 255.0f;
-            rgba >>= 8;
-            B = (rgba & 0xFF) / 255.0f;
-            rgba >>= 8;
-            G = (rgba & 0xFF) / 255.0f;
-            rgba >>= 8;
-            R = (rgba & 0xFF) / 255.0f;
-        }
-
 
         public Color(Vector4 vector4)
         {
-            R = vector4.X;
-            G = vector4.Y;
-            B = vector4.Z;
-            A = vector4.W;
+            channels = vector4;
         }
 
+        public Color(byte r, byte g, byte b, byte a = 255) 
+        {
+            channels = new Vector4
+            (
+                r/255f,
+                g/255f,
+                b/255f,
+                a/255f
+            );
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return HashCode.Combine(R.GetHashCode(), G.GetHashCode(), B.GetHashCode(), A.GetHashCode());
+            return channels.GetHashCode();
         }
 
         public override string ToString()
@@ -85,7 +82,7 @@ namespace VortexCore
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static implicit operator Vector4(Color color)
         {
-            return new Vector4(color.R, color.G, color.B, color.A);
+            return color.channels;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -94,14 +91,43 @@ namespace VortexCore
             return new Color(vector);
         }
 
-        public static implicit operator uint(Color color)
+        public static implicit operator Color(uint value)
         {
-            return (uint)color.ToRgba32();
+            var r = ((value >> 24) & 0xFF) / 255f;
+            var g = ((value >> 16) & 0xFF) / 255f;
+            var b = ((value >> 8) & 0xFF) / 255f;
+            var a = (value & 0xFF) / 255f;
+
+            return new Color(r, g, b, a);
         }
 
-        public static implicit operator int(Color color)
+        public static implicit operator uint(Color color)
+        {   
+            return unchecked((uint)((color.Rb << 24) | (color.Gb << 16) | (color.Bb << 8) | (color.Ab)));
+        }
+
+        public static implicit operator Color(string hex)
         {
-            return color.ToRgba32();
+            uint value;
+            try
+            {
+                var span = hex.AsSpan();
+                if (span[0] == '#')
+                {
+                    span = span.Slice(1);
+                }
+                value = uint.Parse(span, NumberStyles.HexNumber);
+                if (span.Length == 6)
+                {
+                    value = (value << 8) + 0xFF;
+                }
+            }
+            catch
+            {
+                throw new ArgumentException($"Failed to parse the hex rgb '{hex}' as an unsigned 32-bit integer.");
+            }
+
+            return value;
         }
 
         public static bool operator ==(Color left, Color right)
@@ -128,33 +154,7 @@ namespace VortexCore
         {
             return R == other.R && G == other.G && B == other.B && A == other.A;
         }
-
-        public int ToArgb32()
-        {
-            int c = (byte)MathF.Round(A * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(R * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(G * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(B * 255.0f);
-
-            return c;
-        }
-
-        public int ToRgba32()
-        {
-            int c = (byte)MathF.Round(R * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(G * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(B * 255.0f);
-            c <<= 8;
-            c |= (byte)MathF.Round(A * 255.0f);
-
-            return c;
-        }
-
+      
         public static Color Lerp(Color value1, Color value2, float amount)
         {
             return new Color

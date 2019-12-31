@@ -5,14 +5,15 @@ namespace VortexCore
     public struct SokolVertex
     {
         public Vector3 Position;
-        public Color Color;
         public Vector2 Uv;
+        public Vector4 Color;
+        
+        public static readonly int SizeInBytes = 36;
 
-        public SokolVertex(Vector3 pos, Color col, Vector2 uv) {
+        public SokolVertex(Vector3 pos, Vector2 uv, Color col) {
             this.Position = pos;
-            this.Color = col;
             this.Uv = uv;
-    
+            this.Color = col;
         }
     }
 }

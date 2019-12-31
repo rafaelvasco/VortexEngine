@@ -6,10 +6,13 @@ namespace VortexCore
     {
         public sg_image sgImage {get; private set;}
 
-        internal SokolTexture(sg_image sgImage)
+        internal SokolTexture(sg_image sgImage, int width, int height)
         {
             this.sgImage = sgImage;
             IndexHandle = sgImage.id;
+            Width = width;
+            Height = height;
+    
         }
 
         internal override void Dispose()

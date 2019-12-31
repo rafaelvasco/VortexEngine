@@ -5,6 +5,7 @@
         Unknown,
         Windows,
         Linux,
-        MacOS
+        FreeBSD,
+        OSX
     }
 }

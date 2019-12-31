@@ -25,7 +25,7 @@ namespace VortexCore
 
         GraphicsInfo Graphics.Info => info;
 
-        internal Sdl2Graphics(IntPtr windowHandle, int width, int height)
+        internal Sdl2Graphics(IntPtr windowHandle)
         {
             SDL_SetHint("SDL_HINT_RENDER_DRIVER", "opengl");
             ctx = SDL_CreateRenderer(
@@ -70,7 +70,7 @@ namespace VortexCore
 
         void Graphics.Begin()
         {
-            SDL_SetRenderDrawColor(ctx, 255, 173, 197, 255);
+            SDL_SetRenderDrawColor(ctx, 16, 52, 166, 255);
 
             SDL_RenderClear(ctx);
 
@@ -96,7 +96,7 @@ namespace VortexCore
                 h = h
             };
 
-            SDL_SetRenderDrawColor(ctx, color.Ri, color.Gi, color.Bi, color.Ai);
+            SDL_SetRenderDrawColor(ctx, color.Rb, color.Gb, color.Bb, color.Ab);
             SDL_RenderFillRectF(ctx, ref targetRect);
         }
 

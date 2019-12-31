@@ -22,6 +22,7 @@
                 Rotation = this.Rotation,
                 FlipH = false,
                 FlipV = false,
+                Color = 0xFFFFFFFF
             };
         }
 

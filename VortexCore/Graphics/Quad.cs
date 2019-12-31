@@ -24,5 +24,7 @@ namespace VortexCore
 
         public bool FlipV;
 
+        public Color Color;
+
     }
 }

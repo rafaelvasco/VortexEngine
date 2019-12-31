@@ -220,7 +220,7 @@ namespace VortexCore
 
     public class ColorTween : Tween<Color>
     {
-        private static readonly TweeenLerpFunc<Color> LerpFunc = Color.Lerp;
+        private static readonly TweeenLerpFunc<Color> LerpFunc = ColorUtils.Lerp;
 
         public ColorTween() : base(LerpFunc) { }
     }
