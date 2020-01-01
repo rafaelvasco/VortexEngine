@@ -575,5 +575,14 @@ namespace VortexCore
             v1 = v2;
             v2 = temp;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Swap(ref int v1, ref int v2)
+        {
+            var temp = v1;
+            v1 = v2;
+            v2 = temp;
+        }
+
     }
 }

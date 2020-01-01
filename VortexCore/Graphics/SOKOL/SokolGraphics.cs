@@ -1,4 +1,5 @@
 /* Based on code from https://github.com/lithiumtoast/sokol-sharp/ */
+/* and original example codes from https://github.com/floooh/sokol-samples/ */
 /* 
 MIT License
 Copyright (c) 2019 Rafael Vasco
@@ -69,11 +70,9 @@ namespace VortexCore
 
         private int maxDrawCalls;
 
-
         public GraphicsInfo Info => info;
 
         public int MaxDrawCalls => maxDrawCalls;
-
 
         internal SokolGraphics(IntPtr windowHandle)
         {
@@ -262,6 +261,16 @@ namespace VortexCore
             float v = quad.SrcY * invTexHeight;
             float u2 = (quad.SrcX + quad.SrcWidth) * invTexWidth;
             float v2 = (quad.SrcY + quad.SrcHeight) * invTexHeight;
+
+            if (quad.FlipH) 
+            {
+                Calc.Swap(ref u, ref u2);
+            }
+
+            if (quad.FlipV)
+            {
+                Calc.Swap(ref v, ref v2);
+            }
 
             var col = quad.Color;
 
