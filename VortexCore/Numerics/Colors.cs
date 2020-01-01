@@ -1,5 +1,4 @@
 /* Adapted from https://github.com/lithiumtoast/sokol-sharp/blob/develop/src/Sokol.Graphics/RgbaFloat.cs */
-
 /* 
 MIT License
 Copyright (c) 2019 Rafael Vasco

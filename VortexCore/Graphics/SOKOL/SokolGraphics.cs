@@ -1,3 +1,24 @@
+/* Based on code from https://github.com/lithiumtoast/sokol-sharp/ */
+/* 
+MIT License
+Copyright (c) 2019 Rafael Vasco
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ */
+
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -8,7 +29,7 @@ namespace VortexCore
 {
     internal unsafe partial class SokolGraphics : Graphics
     {
-        public static readonly int MaxVertexCount = 64;
+        public static readonly int MaxQuads = 16;
 
         private GraphicsInfo info;
 
@@ -26,7 +47,9 @@ namespace VortexCore
 
         private SokolVertex[] vertices;
 
-        private int quadCount = 0;
+        private int batchQuadCount = 0;
+
+        private int accumQuadCount = 0;
 
         private Texture2D onePxTexture;
 
@@ -42,7 +65,14 @@ namespace VortexCore
 
         private int renderHeight;
 
+        private int drawCalls;
+
+        private int maxDrawCalls;
+
+
         public GraphicsInfo Info => info;
+
+        public int MaxDrawCalls => maxDrawCalls;
 
 
         internal SokolGraphics(IntPtr windowHandle)
@@ -71,7 +101,8 @@ namespace VortexCore
 
         private void InitializeBufferBindings()
         {
-            vertices = new SokolVertex[MaxVertexCount];
+            int maxVertices = MaxQuads * 4;
+            vertices = new SokolVertex[maxVertices];
 
             var vertexBufferDesc = new sg_buffer_desc();
             vertexBufferDesc.usage = sg_usage.SG_USAGE_STREAM;
@@ -80,9 +111,9 @@ namespace VortexCore
 
             vertexBuffer = sg_make_buffer(ref vertexBufferDesc);
 
-            var indicesLen = MaxVertexCount / 4 * 6;
+            var indicesLen = MaxQuads * 6;
 
-            var indices = stackalloc ushort[MaxVertexCount / 4 * 6];
+            var indices = stackalloc ushort[MaxQuads * 6];
 
             ushort indice_i = 0;
 
@@ -115,7 +146,7 @@ namespace VortexCore
             shaderDescr.vs.uniformBlock(0).size = Unsafe.SizeOf<Matrix4x4>();
 
             ref var mvpUniform = ref shaderDescr.vs.uniformBlock(0).uniform(0);
-            mvpUniform.name = (byte*) Marshal.StringToHGlobalAnsi("mvp");
+            mvpUniform.name = (byte*)Marshal.StringToHGlobalAnsi("mvp");
             mvpUniform.type = sg_uniform_type.SG_UNIFORMTYPE_MAT4;
 
             shaderDescr.fs.image(0).type = sg_image_type.SG_IMAGETYPE_2D;
@@ -145,7 +176,7 @@ namespace VortexCore
             // quadPipelineDescr.depth_stencil.depth_compare_func = sg_compare_func.SG_COMPAREFUNC_LESS_EQUAL;
             // quadPipelineDescr.depth_stencil.depth_write_enabled = true;
             // quadPipelineDescr.rasterizer.cull_mode = sg_cull_mode.SG_CULLMODE_BACK;
-            quadPipelineDescr.rasterizer.sample_count = 4;
+            quadPipelineDescr.rasterizer.sample_count = 0;
 
             pipeline = sg_make_pipeline(ref quadPipelineDescr);
 
@@ -189,34 +220,30 @@ namespace VortexCore
         {
             sg_begin_default_pass(ref clearAction, this.renderWidth, this.renderHeight);
             sg_apply_pipeline(pipeline);
+            var mvpMatrix = Unsafe.AsPointer(ref renderMatrix);
+            sg_apply_uniforms(sg_shader_stage.SG_SHADERSTAGE_VS, 0, mvpMatrix, Unsafe.SizeOf<Matrix4x4>());
         }
 
         void Graphics.End()
         {
             Flush();
-        }
-
-        private void Flush()
-        {
-            if (quadCount > 0)
+            if (drawCalls > maxDrawCalls)
             {
-                fixed (void* vertexPointer = vertices)
-                {
-                    sg_update_buffer(vertexBuffer, vertexPointer, (quadCount * 4) * SokolVertex.SizeInBytes);
-                }
-
-                sg_apply_bindings(ref bindings);
-
-                var mvpMatrix = Unsafe.AsPointer(ref renderMatrix);
-                sg_apply_uniforms(sg_shader_stage.SG_SHADERSTAGE_VS, 0, mvpMatrix, Unsafe.SizeOf<Matrix4x4>());
-                sg_draw(0, quadCount * 6, 1);
-                quadCount = 0;
-
+                maxDrawCalls = drawCalls;
             }
+            drawCalls = 0;
+            accumQuadCount = 0;
         }
+
+
 
         void Graphics.DrawQuad(Texture2D texture, ref Quad quad)
         {
+            if (accumQuadCount + 1 > MaxQuads) 
+            {
+                return;
+            }
+            
             if (currentTexture != null && currentTexture.IndexHandle != texture.IndexHandle)
             {
                 Flush();
@@ -240,7 +267,7 @@ namespace VortexCore
 
             fixed (SokolVertex* fixedVertexPointer = vertices)
             {
-                var vertexPointer = fixedVertexPointer + quadCount++ * 4;
+                var vertexPointer = fixedVertexPointer + (batchQuadCount++) * 4;
 
                 vertexPointer[0].Position = new Vector3(x1, y1, 0f);
                 vertexPointer[0].Uv = new Vector2(u, v);
@@ -258,10 +285,15 @@ namespace VortexCore
                 vertexPointer[3].Uv = new Vector2(u, v2);
                 vertexPointer[3].Color = col;
             }
+            accumQuadCount++;
         }
 
         void Graphics.FillRect(float x, float y, float w, float h, Color color)
         {
+            if (accumQuadCount + 1 > MaxQuads) 
+            {
+                return;
+            }
 
             if (currentTexture != null && currentTexture.IndexHandle != onePxTexture.IndexHandle)
             {
@@ -276,7 +308,7 @@ namespace VortexCore
 
             fixed (SokolVertex* fixedVertexPointer = vertices)
             {
-                var vertexPointer = fixedVertexPointer + quadCount++ * 4;
+                var vertexPointer = fixedVertexPointer + (batchQuadCount++) * 4;
 
                 vertexPointer[0].Position = new Vector3(x1, y1, 0f);
                 vertexPointer[0].Uv = new Vector2(0, 0);
@@ -294,19 +326,42 @@ namespace VortexCore
                 vertexPointer[3].Uv = new Vector2(0, 1);
                 vertexPointer[3].Color = color;
             }
+
+            accumQuadCount++;
         }
 
         private void SetCurrentTexture(Texture2D texture, int slot = 0)
         {
             bindings.fs_image(0) = texture.IndexHandle;
-            //sg_apply_bindings(ref bindings);
             currentTexture = texture;
+        }
+
+        private void Flush()
+        {
+            if (batchQuadCount > 0)
+            {
+                int bufferIndex = 0;
+                fixed (SokolVertex* vertexPointer = vertices)
+                {
+                    bufferIndex = sg_append_buffer(vertexBuffer, vertexPointer, (batchQuadCount) * 4 * SokolVertex.SizeInBytes);
+                    var info = sg_query_buffer_info(vertexBuffer);
+                }
+
+                bindings.vertex_buffer_offset(0) = bufferIndex;
+
+                sg_apply_bindings(ref bindings);
+                sg_draw(0, batchQuadCount * 6, 1);
+                drawCalls++;
+            }
+
+             batchQuadCount = 0;
         }
 
         void Graphics.Present()
         {
             sg_end_pass();
             sg_commit();
+
         }
 
         Texture2D Graphics.CreateTexture(Pixmap pixmap)

@@ -25,6 +25,8 @@ namespace VortexCore
 
         GraphicsInfo Graphics.Info => info;
 
+        public int MaxDrawCalls => 0;
+
         internal Sdl2Graphics(IntPtr windowHandle)
         {
             SDL_SetHint("SDL_HINT_RENDER_DRIVER", "opengl");

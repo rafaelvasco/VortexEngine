@@ -5,6 +5,13 @@
         private Texture2D texture;
         private Quad quad;
 
+        public Color Tint 
+        {
+            get => quad.Color;
+            set => quad.Color = value;
+            
+        }
+
         public Sprite(Texture2D texture, Rect sourceRect = default)
         {
             this.texture = texture;
