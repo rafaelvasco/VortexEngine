@@ -70,6 +70,10 @@ namespace VortexCore
 
         private int maxDrawCalls;
 
+        private float currentTexInvWidth;
+
+        private float currentTexInvHeight;
+
         public GraphicsInfo Info => info;
 
         public int MaxDrawCalls => maxDrawCalls;
@@ -78,11 +82,11 @@ namespace VortexCore
         {
             InitializeGraphicsDevice(windowHandle);
 
-            InitializeBufferBindings();
+            InitializeRenderPipelines();
+            
+            InitializeRenderBuffers();
 
-            InitializeBasePipeline();
-
-            InitializeBaseStateAndResources();
+            InitializeRenderStateAndResources();
         }
 
         private void InitializeGraphicsDevice(IntPtr windowHandle)
@@ -98,7 +102,7 @@ namespace VortexCore
             this.info.Driver = driverInfo.ToString();
         }
 
-        private void InitializeBufferBindings()
+        private void InitializeRenderBuffers()
         {
             int maxVertices = MaxQuads * 4;
             vertices = new SokolVertex[maxVertices];
@@ -139,7 +143,7 @@ namespace VortexCore
 
         }
 
-        private void InitializeBasePipeline()
+        private void InitializeRenderPipelines()
         {
             var shaderDescr = new sg_shader_desc();
             shaderDescr.vs.uniformBlock(0).size = Unsafe.SizeOf<Matrix4x4>();
@@ -187,7 +191,7 @@ namespace VortexCore
             clearAction = sg_pass_action.clear(Colors.Black);
         }
 
-        private void InitializeBaseStateAndResources()
+        private void InitializeRenderStateAndResources()
         {
             var (width, height) = ImplGetRenderSize();
 
@@ -234,8 +238,6 @@ namespace VortexCore
             accumQuadCount = 0;
         }
 
-
-
         void Graphics.DrawQuad(Texture2D texture, ref Quad quad)
         {
             if (accumQuadCount + 1 > MaxQuads) 
@@ -254,8 +256,8 @@ namespace VortexCore
             float x2 = quad.X + quad.Width;
             float y2 = quad.Y + quad.Height;
 
-            float invTexWidth = 1.0f / texture.Width;
-            float invTexHeight = 1.0f / texture.Height;
+            float invTexWidth = currentTexInvWidth;
+            float invTexHeight = currentTexInvHeight;
 
             float u = quad.SrcX * invTexWidth;
             float v = quad.SrcY * invTexHeight;
@@ -342,6 +344,8 @@ namespace VortexCore
         private void SetCurrentTexture(Texture2D texture, int slot = 0)
         {
             bindings.fs_image(0) = texture.IndexHandle;
+            currentTexInvWidth = 1.0f/texture.Width;
+            currentTexInvHeight = 1.0f/texture.Height;
             currentTexture = texture;
         }
 
