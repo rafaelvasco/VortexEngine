@@ -46,5 +46,7 @@ namespace VortexCore
 
         public Color Color;
 
+        public float Alpha;
+
     }
 }

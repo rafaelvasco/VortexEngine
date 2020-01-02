@@ -7,6 +7,7 @@ namespace VortexDemo
 {
     public class Player : Actor
     {
+        //TODO: Refactor GameObject system
         private Spritesheet spritesheet;
         private Animation idleHorizontal;
         private Animation walkingHorizontal;

@@ -30,8 +30,27 @@ namespace VortexCore
 
         public override float Height => groupHeight;
 
-        private float groupWidth;
+        public override float Rotation 
+        {
+            get => 0.0f;
+            set {} //TODO:
+        }
+        public override float Opacity 
+        {
+            get => opacity;
+            set 
+            {
+                opacity = value;
+                foreach(var child in GameObjects) 
+                {
+                    child.Opacity = opacity;
+                }
+            }
+        }
 
+
+        private float opacity;
+        private float groupWidth;
         private float groupHeight;
 
         public Group()

@@ -49,6 +49,16 @@
             get => quad.FlipV;
             set => quad.FlipH = value;
         }
+        public override float Rotation 
+        {
+            get => quad.Rotation;
+            set => quad.Rotation = value;
+        }
+        public override float Opacity 
+        {
+            get => quad.Alpha;
+            set => quad.Alpha = Calc.Clamp(value, 0.0f, 1.0f);
+        }
 
         public override void Draw(Graphics graphics, float parentX = 0, float parentY = 0)
         {

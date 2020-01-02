@@ -36,15 +36,15 @@ namespace VortexCore
 
         public float Y;
 
-        public float Rotation;
+        public abstract float Rotation { get; set; }
 
-        public float Alpha = 1.0f;
+        public abstract float Opacity { get; set; }
 
         public abstract float Width { get; }
 
         public abstract float Height { get; }
 
-        public RectF BoundingRect 
+        public RectF BoundingRect
         {
             get => new RectF(X, Y, Width, Height);
         }
